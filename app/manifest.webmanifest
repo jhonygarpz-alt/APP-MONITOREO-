@@ -1,7 +1,7 @@
 {
   "name": "Centinela · Monitoreo",
   "short_name": "Centinela",
-  "description": "Monitoreo de alertas e incidentes.",
+  "description": "Protocolos, emergencias y bitácora del turno de monitoreo.",
   "lang": "es-MX",
   "start_url": "./",
   "scope": "./",
