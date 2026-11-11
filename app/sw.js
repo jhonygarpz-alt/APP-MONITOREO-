@@ -1,6 +1,6 @@
 /* Service worker: guarda la app para abrirla aunque falle la red. */
-const CACHE = 'centinela-v1.2.0';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'manifest.webmanifest',
+const CACHE = 'centinela-v1.6.0';
+const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'directorio.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

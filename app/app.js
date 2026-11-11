@@ -51,29 +51,23 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const PR = { crit: ['CRÍTICA', 'alert'], high: ['ALTA', 'excl'], med: ['MEDIA', 'diamond'] };
 const prTag = p => `<span class="pr pr-${p}">${svg(PR[p][1], 2.6)}${PR[p][0]}</span>`;
 const PR_ORDER = { crit: 0, high: 1, med: 2 };
-const INC_STATUS = { activa: ['Sin atender', 'pr-crit'], atencion: ['En atención', 'pr-info'], cerrada: ['Cerrado', 'pr-muted'] };
 
 /* ---------- Estado persistente ---------- */
 function freshState() {
   const now = Date.now();
   return {
-    t0: now,
-    inc: Object.fromEntries(D.incidents.map(i => [i.id, { status: i.status, owner: i.owner || '', closedNote: i.closedNote || '', notes: [], steps: [] }])),
-    log: D.log.map(([m, cat, text]) => ({ t: now - m * 60000, cat, text })),
-    handover: D.handover.map(() => false),
+    t0: now, v3: true,
     settings: { theme: 'light', big: false, rm: false, v2: true }
   };
 }
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
-if (!S || !S.inc || !S.settings) S = freshState();
+if (!S || !S.settings) S = freshState();
+if (!S.v3) { const st = S.settings; S = freshState(); S.settings = st; S.v3 = true; }
 if (!S.settings.v2) { S.settings.theme = 'light'; S.settings.v2 = true; }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
-const incs = () => D.incidents.map(i => Object.assign({}, i, S.inc[i.id], { opened: S.t0 - i.openedMin * 60000 }));
-const inc = id => incs().find(i => i.id === id);
 const proto = id => D.protocols.find(p => p.id === id);
-const sortInc = a => a.sort((x, y) => PR_ORDER[x.pr] - PR_ORDER[y.pr] || y.opened - x.opened);
 const hhmm = t => new Date(t).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
 const ago = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h ${m % 60} min`; };
 const clock = t => { const s = Math.max(0, Math.floor((Date.now() - t) / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0'); };
@@ -84,40 +78,22 @@ function shift() {
   if (h >= 14 && h < 22) return { name: 'Vespertino A', next: '22:00' };
   return { name: 'Nocturno B', next: '06:00' };
 }
-function counts() {
-  const all = incs();
-  const open = all.filter(i => i.status !== 'cerrada');
-  return {
-    pending: all.filter(i => i.status === 'activa').length,
-    open: open.length,
-    openCrit: open.some(i => i.pr === 'crit'),
-    atencion: all.filter(i => i.status === 'atencion').length,
-    closed: all.filter(i => i.status === 'cerrada').length,
-    crit: open.filter(i => i.pr === 'crit').length,
-    critPending: all.filter(i => i.status === 'activa' && i.pr === 'crit').length,
-    signal: open.filter(i => i.protocol === 'P-03').length,
-    horario: open.filter(i => i.protocol === 'P-05').length,
-    zone: open.filter(i => i.zone).length
-  };
-}
-function addLog(cat, text) { S.log.unshift({ t: Date.now(), cat, text }); save(); }
 
 /* ---------- Navegación ---------- */
 const NAV = [
   ['Operación'],
   ['inicio', 'Inicio', 'home', 'c-home'],
-  ['alertas', 'Alertas e incidentes', 'alert', 'c-alert', () => { const c = counts(); return { n: c.open, cls: c.openCrit ? 'crit' : 'warn' }; }, true],
   ['protocolos', 'Protocolos', 'proto', 'c-proto'],
   ['emergencias', 'Emergencias', 'sos', 'c-sos'],
+  ['directorio', 'Directorio de operadores', 'users', 'c-unit'],
   ['Control'],
   ['seguros', 'Seguros', 'shield', 'c-ins', () => { const n = D.policies.filter(p => p.expiresDays).length; return n ? { n, cls: 'warn' } : null; }],
-  ['horarios', 'Horarios de circulación', 'clock', 'c-time', () => { const n = counts().horario; return n ? { n, cls: 'warn' } : null; }],
-  ['zonas', 'Zonas de riesgo', 'zone', 'c-zone', () => { const n = counts().zone; return n ? { n, cls: 'warn' } : null; }],
-  ['bitacora', 'Bitácora y relevo', 'log', 'c-log', () => ({ n: shift().next })],
+  ['horarios', 'Horarios de circulación', 'clock', 'c-time'],
+  ['zonas', 'Zonas de riesgo', 'zone', 'c-zone'],
   ['reportes', 'Reportes', 'rep', 'c-rep'],
   ['config', 'Configuración', 'cfg', 'c-cfg']
 ];
-const PARENT = { incidente: 'alertas', protocolo: 'protocolos' };
+const PARENT = { protocolo: 'protocolos' };
 
 const app = document.getElementById('app');
 const view = document.getElementById('view');
@@ -127,7 +103,6 @@ const toastEl = document.getElementById('toast');
 let subOpen = true, current = 'inicio';
 
 function renderDrawer() {
-  const c = counts();
   let h = `<div class="d-head">${ic('shield', 'c-brand', true)}<div class="n"><b>${esc(D.company.app)}</b><small>${esc(D.company.name)}</small></div>
     <button class="btn-ic expand" data-a="menu" aria-label="Expandir menú">${svg('expand')}</button>
     <button class="btn-ic" data-a="close" data-close aria-label="Cerrar menú">${svg('x')}</button></div>
@@ -141,15 +116,7 @@ function renderDrawer() {
     const mini = cnt && cnt.cls ? `<span class="mini ${cnt.cls}">${cnt.n}</span>` : '';
     const cur = (PARENT[current] || current) === id;
     h += `<div data-nav="${lbl.toLowerCase()}">`;
-    if (hasSub) {
-      h += `<button class="item" data-a="toggle" data-id="${id}" aria-expanded="${subOpen}" ${cur ? 'aria-current="page"' : ''}>
-        <span class="ic ${col}">${svg(icon)}${mini}</span><span class="lbl">${lbl}</span>${cntH}${svg('chev', 2, 'chev')}</button>
-        <div class="sub ${subOpen ? 'open' : ''}"><div>
-          <a href="#alertas" data-go>Activas<span class="cnt num ${c.pending ? 'crit' : ''}">${c.pending}</span></a>
-          <a href="#alertas-atencion" data-go>En atención<span class="cnt num">${c.atencion}</span></a>
-          <a href="#alertas-cerradas" data-go>Cerradas hoy<span class="cnt num">${c.closed}</span></a>
-        </div></div>`;
-    } else {
+    {
       h += `<a class="item" href="#${id}" data-go ${cur ? 'aria-current="page"' : ''} style="text-decoration:none;color:inherit"><span class="ic ${col}">${svg(icon)}${mini}</span><span class="lbl">${lbl}</span>${cntH}</a>`;
     }
     h += `</div>`;
@@ -159,8 +126,6 @@ function renderDrawer() {
     <div class="ops" aria-label="Estado del turno">
       <div><small>Turno activo</small><b>${sh.name}</b></div>
       <div><small>Conexión</small><b data-net></b></div>
-      <div><small>Actualización</small><b class="num">hace <span data-tick>0</span> s</b></div>
-      <div><small>Pendientes</small><b class="num">${c.pending} · relevo ${sh.next}</b></div>
     </div>
     <div class="d-foot">
       <div class="row"><span class="ic c-cfg">${svg('moon')}</span><span class="lbl">Modo nocturno</span><button class="switch" role="switch" aria-checked="${isDark()}" aria-label="Modo nocturno" data-a="night"></button></div>
@@ -173,15 +138,12 @@ function renderDrawer() {
 /* ---------- Componentes ---------- */
 const EVT = { 'P-01': 'sos', 'P-02': 'car', 'P-03': 'antenna', 'P-04': 'hand', 'P-05': 'clock', 'P-06': 'zone', 'P-07': 'speed' };
 const evIc = (protoId, pr, lg) => ic(EVT[protoId] || 'alert', 't-' + pr, lg);
-const LOGIC = { Llamada: ['phone', 'c-rep'], Novedad: ['info', 'c-unit'], Incidente: ['alert', 't-crit'], Relevo: ['users', 'c-proto'] };
 const lc = s => s.charAt(0).toLowerCase() + s.slice(1);
-const folio = id => '#' + id.split('-').pop();
 
 function topbar(title, sub, back) {
-  const c = counts();
   const left = back
     ? `<a class="btn-ic" href="#${back}" aria-label="Volver">${svg('back')}</a>`
-    : `<button class="btn-ic menu-btn" data-a="menu" aria-label="Abrir menú. ${c.pending} pendientes">${svg('menu')}${c.pending ? `<span class="badge num">${c.pending}</span>` : ''}</button>`;
+    : `<button class="btn-ic menu-btn" data-a="menu" aria-label="Abrir menú">${svg('menu')}</button>`;
   return `<header class="topbar"><div class="bar">${left}<button class="sos" data-a="sos">${svg('sos', 2.2)}<span class="lbl">Emergencias</span></button></div>
     <div class="t"><h1>${title}</h1><small>${sub}</small></div></header>`;
 }
@@ -194,22 +156,19 @@ function grouped(items, row, emptyText) {
   }).join('');
 }
 const prSeg = () => `<div class="tabs" role="group" aria-label="Filtrar por prioridad">${[['all', 'Todos'], ['crit', 'Crítica'], ['high', 'Alta'], ['med', 'Media']].map(([v, l]) => `<button data-a="prf" data-v="${v}" aria-pressed="${v === 'all'}">${l}</button>`).join('')}</div>`;
-function incRow(i) {
-  const u = i.v, st = INC_STATUS[i.status];
-  return `<a class="li" href="#incidente-${i.id}" data-pr="${i.pr}" data-s="${esc([i.id, u.unit, u.plate, u.driver, i.title].join(' ').toLowerCase())}">
-    ${evIc(i.protocol, i.pr)}
-    <span class="body"><span class="ttl">${esc(i.title)}</span><span class="sub">${esc(u.unit)} · ${esc(u.plate)} · ${esc(u.driver)}</span>
-      <span class="tags">${i.status !== 'activa' ? `<span class="pr ${st[1]}">${st[0]}</span>` : `<span class="pr pr-${i.pr}">Sin atender</span>`}<span class="sub" style="margin:0">${ago(i.opened)}</span></span></span>
-    <span class="end num">${folio(i.id)}${svg('chev', 2, 'chev')}</span></a>`;
-}
 function protoRow(p) {
-  return `<a class="li" href="#protocolo-${p.id}" data-pr="${p.pr}" data-s="${esc((p.id + ' ' + p.name).toLowerCase())}">${evIc(p.id, p.pr)}
+  return `<a class="li" href="#protocolo-${p.id}" data-pr="${p.pr}" data-s="${esc((p.id + ' ' + p.name + ' ' + p.steps.join(' ')).toLowerCase())}">${evIc(p.id, p.pr)}
     <span class="body"><span class="ttl">${esc(p.name)}</span><span class="sub">${p.steps.length} pasos · Escalar: ${esc(lc(p.escalate))}</span></span>
     <span class="end num">${p.id}${svg('chev', 2, 'chev')}</span></a>`;
 }
 function contactRow(c, direct) {
-  return `<div class="li">${ic(c.icon, c.public ? 'c-sos' : 'c-unit', true)}<span class="body"><span class="ttl">${esc(c.name)}</span><span class="sub tel">${esc(c.number)}</span>${c.note ? `<span class="sub">${esc(c.note)}</span>` : ''}</span>
+  return `<div class="li" data-s="${esc((c.name + ' ' + c.number + ' ' + (c.note || '')).toLowerCase())}">${ic(c.icon, c.public ? 'c-sos' : 'c-unit', true)}<span class="body"><span class="ttl">${esc(c.name)}</span><span class="sub tel">${esc(c.number)}</span>${c.note ? `<span class="sub">${esc(c.note)}</span>` : ''}</span>
     <button class="call" data-a="${direct ? 'dialnow' : 'dial'}" data-name="${esc(c.name)}" data-num="${esc(c.number)}">Llamar</button></div>`;
+}
+function zoneRow(z) {
+  const alto = z.level === 'alto';
+  return `<a class="li" href="#zonas" data-s="${esc((z.id + ' ' + z.name + ' ' + z.state + ' ' + z.risk).toLowerCase())}">${ic('zone', alto ? 't-crit' : 't-med', true)}
+    <span class="body"><span class="ttl">${esc(z.name)}</span><span class="sub">${esc(z.state)} · ${esc(z.risk)}</span><span class="tags">${alto ? `<span class="pr pr-crit">Riesgo alto</span>` : `<span class="pr pr-med">Riesgo medio</span>`}<span class="sub num" style="margin:0">${esc(z.window)}</span></span></span>${svg('chev', 2, 'chev')}</a>`;
 }
 const searchBox = (ph, id) => `<label class="search">${svg('search')}<input type="search" id="${id}" data-a="filter" placeholder="${ph}" aria-label="${ph}" autocomplete="off"></label>`;
 const emptyBox = t => `<div class="empty" data-empty hidden style="margin-top:14px">${t}</div>`;
@@ -218,74 +177,12 @@ const callBtn = (name, number, label) => `<button class="call ${label ? 'neutral
 /* ---------- Pantallas ---------- */
 const PAGES = {};
 
-PAGES.inicio = () => {
-  const c = counts();
-  const att = sortInc(incs().filter(i => i.status !== 'cerrada'));
-  return topbar('Inicio', `${esc(D.company.name)} · Turno ${shift().name}`) +
+PAGES.inicio = () => topbar('Inicio', `${esc(D.company.name)} · Turno ${shift().name}`) +
   `<div data-install-slot></div>
-  ${searchBox('Folio, unidad, placa u operador', 'home-search')}
-  <div class="pulse">
-    <span class="chip"><span data-net></span></span>
-    <span class="chip num">Actualizado hace <span data-tick>0</span> s</span>
-    <span class="chip demo">${svg('info', 2.4).replace('<svg', '<svg width="14" height="14"')}Datos de ejemplo</span>
-  </div>
-  <div class="kpis">
-    <a class="kpi" href="#alertas"><div class="top">${ic('alert', 'c-unit', true)}</div><div class="v num">${c.open}</div><div><div class="l">Incidentes abiertos</div><div class="s">${c.pending} sin atender</div></div></a>
-    <a class="kpi ${c.signal ? 'is-crit' : ''}" href="#protocolo-P-03"><div class="top">${ic('antenna', 't-crit', true)}${c.signal ? prTag('crit') : ''}</div><div class="v num">${c.signal}</div><div><div class="l">Sin comunicación</div><div class="s">incidentes abiertos</div></div></a>
-    <a class="kpi ${c.horario ? 'is-high' : ''}" href="#horarios"><div class="top">${ic('clock', 't-high', true)}${c.horario ? prTag('high') : ''}</div><div class="v num">${c.horario}</div><div><div class="l">Fuera de horario</div><div class="s">restricción 23:00 – 05:00</div></div></a>
-    <a class="kpi ${c.crit ? 'is-crit' : ''}" href="#emergencias"><div class="top">${ic('sos', 't-crit', true)}${c.crit ? prTag('crit') : ''}</div><div class="v num">${c.crit}</div><div><div class="l">Alertas críticas</div><div class="s">sin atender: ${c.critPending}</div></div></a>
-  </div>
-  ${secH('Requieren atención', `${att.length} abiertos`)}
-  ${prSeg()}
-  ${grouped(att, incRow, 'No hay incidentes abiertos.')}
-  ${emptyBox('Sin resultados. Prueba con otro folio, unidad, placa u operador.')}`;
-};
-
-PAGES.alertas = (tab) => {
-  tab = ['atencion', 'cerradas'].includes(tab) ? tab : 'activas';
-  const st = { activas: 'activa', atencion: 'atencion', cerradas: 'cerrada' }[tab];
-  const list = sortInc(incs().filter(i => i.status === st));
-  const c = counts();
-  const t = (k, l, n) => `<button role="tab" aria-selected="${tab === k}" data-a="go" data-to="${k === 'activas' ? 'alertas' : 'alertas-' + k}">${l} <span class="cnt num">${n}</span></button>`;
-  return topbar('Alertas e incidentes', `${c.open} abiertos · ${c.crit} críticos`) +
-  `<div class="pills" role="tablist" aria-label="Estado">${t('activas', 'Sin atender', c.pending)}${t('atencion', 'En atención', c.atencion)}${t('cerradas', 'Cerradas hoy', c.closed)}</div>
-  ${searchBox('Folio, unidad, placa u operador', 'alerts-search')}
-  ${prSeg()}
-  ${grouped(list, incRow, tab === 'activas' ? 'No hay incidentes sin atender.' : 'Sin incidentes en esta lista.')}
-  ${emptyBox('Sin resultados para esa búsqueda.')}`;
-};
-
-PAGES.incidente = (id) => {
-  const i = inc(id); if (!i) return PAGES.alertas();
-  const u = i.v, p = proto(i.protocol), st = INC_STATUS[i.status];
-  const steps = p.steps.map((s, k) => `<li><button role="checkbox" aria-checked="${!!i.steps[k]}" data-a="step" data-inc="${i.id}" data-k="${k}" ${i.status === 'cerrada' ? 'disabled' : ''}><span class="box">${svg('check', 3)}</span><span class="txt">${esc(s)}</span></button></li>`).join('');
-  const ev = [...i.notes.map(n => [n.t, n.text]), ...i.events.map(([m, t]) => [S.t0 - m * 60000, t])].sort((a, b) => b[0] - a[0]);
-  const closed = i.status === 'cerrada';
-  return topbar('Incidente', `${i.id}${i.owner ? ' · ' + (i.owner === D.user.name ? 'Asignado a ti' : esc(i.owner)) : ''}`, 'alertas') +
-  `<section class="banner b-${i.pr}" aria-label="Prioridad ${PR[i.pr][0].toLowerCase()}">
-    <div class="head">${evIc(i.protocol, i.pr, true)}<div class="tags">${prTag(i.pr)}<span class="pr ${st[1]}">${st[0]}</span></div></div>
-    <h2>${esc(i.title)}</h2>
-    <div class="meta">${closed ? `<span>Cerrado · abierto a las ${hhmm(i.opened)}</span>` : `<span>Abierto hace <span class="num" data-since="${i.opened}">${clock(i.opened)}</span></span><span>Escalar: ${esc(lc(p.escalate))}</span>`}</div>
-  </section>
-  ${closed ? `<section class="card"><h3>${ic('check', 'c-rep')}Nota de cierre</h3><p>${esc(i.closedNote)}</p></section>` : `<div class="actions">
-    ${i.status === 'activa' ? `<button class="act danger" data-a="take" data-inc="${i.id}">${ic('user', '')}<span class="grow">Atender incidente<small>Se asigna a ti y queda en bitácora</small></span></button>` : ''}
-    <button class="act primary" data-a="dial" data-name="${esc(u.driver)}" data-num="${esc(u.phone)}">${ic('phone', '')}<span class="grow">Llamar al operador<small>Se confirma antes de marcar</small></span></button>
-    <button class="act" data-a="report" data-inc="${i.id}">${ic('send', 'c-unit')}<span class="grow">Enviar reporte<small>Requiere confirmación</small></span></button>
-    <button class="act" data-a="closeinc" data-inc="${i.id}">${ic('check', 'c-rep')}<span class="grow">Cerrar incidente<small>Pide nota de cierre</small></span></button>
-  </div>`}
-  <section class="card"><h3>${ic('truck', 'c-unit')}Vehículo involucrado</h3><div class="kv">
-    <div><small>Unidad</small><b>${esc(u.unit)}</b></div><div><small>Placa</small><b class="num">${esc(u.plate)}</b></div>
-    <div><small>Operador</small><b>${esc(u.driver)}</b></div><div><small>Viaje</small><b class="num">${esc(u.trip)}</b></div>
-    <div class="full"><small>Ruta</small><b>${esc(u.route)} · ${esc(u.cargo)}</b></div>
-    <div class="full"><small>Última posición</small><b>${esc(u.pos)}</b></div>
-    <div><small>Última señal</small><b class="num">${hhmm(S.t0 - u.signalMin * 60000)}</b></div><div><small>Velocidad</small><b class="num">${u.speed} km/h</b></div>
-  </div><a class="link" href="https://www.google.com/maps?q=${u.lat},${u.lng}" target="_blank" rel="noopener">${svg('map')}Abrir ubicación en Mapas</a></section>
-  <section class="card"><h3>${evIc(p.id, p.pr)}Protocolo ${p.id} · ${esc(p.name)}</h3><ul class="steps">${steps}</ul></section>
-  <section class="card"><h3>${ic('log', 'c-log')}Bitácora del incidente</h3>
-    <ol class="tl">${ev.map(([t, x]) => `<li><time class="num">${hhmm(t)}</time><span>${esc(x)}</span></li>`).join('')}</ol>
-    ${closed ? '' : `<form class="note" data-form="incnote" data-inc="${i.id}"><input id="note-${i.id}" placeholder="Agregar nota" aria-label="Nota para la bitácora del incidente" autocomplete="off"><button type="submit">Agregar</button></form>`}
-  </section>`;
-};
+  <nav class="apps" aria-label="Funciones de la app">${NAV.filter(n => n.length > 1 && n[0] !== 'inicio').map(([id, lbl, icon, col, cntF]) => {
+    const cnt = cntF && cntF();
+    return `<a class="app-i" href="#${id}"><span class="ic ${col}">${svg(icon)}${cnt ? `<span class="badge num">${cnt.n}</span>` : ''}</span><span class="lbl">${lbl}</span></a>`;
+  }).join('')}</nav>`;
 
 PAGES.protocolos = () => topbar('Protocolos', `${D.protocols.length} protocolos vigentes`) +
   searchBox('Buscar protocolo', 'proto-search') + prSeg() +
@@ -294,23 +191,31 @@ PAGES.protocolos = () => topbar('Protocolos', `${D.protocols.length} protocolos 
 
 PAGES.protocolo = (id) => {
   const p = proto(id); if (!p) return PAGES.protocolos();
-  const open = sortInc(incs().filter(i => i.protocol === p.id && i.status !== 'cerrada'));
   const contacts = D.contacts.filter(c => (p.pr === 'crit' ? ['911', '088'] : ['078']).includes(c.number) || c.name.startsWith('Cabina'));
   return topbar(`Protocolo ${p.id}`, esc(p.name), 'protocolos') +
   `<section class="banner b-${p.pr}"><div class="head">${evIc(p.id, p.pr, true)}<div class="tags">${prTag(p.pr)}</div></div><h2>${esc(p.name)}</h2><div class="meta"><span>Escalar: ${esc(lc(p.escalate))}</span><span>${p.steps.length} pasos en orden</span></div></section>
   <section class="card"><h3>${ic('proto', 'c-proto')}Pasos</h3><ol class="steps">${p.steps.map((s, k) => `<li class="st"><span class="n-step num">${k + 1}</span><span>${esc(s)}</span></li>`).join('')}</ol></section>
-  ${secH('Contactos del protocolo')}<div class="group">${contacts.map(c => contactRow(c)).join('')}</div>
-  ${open.length ? secH('Incidentes abiertos con este protocolo', open.length) + `<div class="group">${open.map(incRow).join('')}</div>` : ''}`;
+  ${secH('Contactos del protocolo')}<div class="group">${contacts.map(c => contactRow(c)).join('')}</div>`;
 };
 
-PAGES.emergencias = () => {
-  const crit = sortInc(incs().filter(i => i.status !== 'cerrada' && i.pr === 'crit'));
-  return topbar('Emergencias', 'Toca Llamar y confirma. Los números quedan visibles para marcarlos desde otro teléfono.') +
+PAGES.emergencias = () => topbar('Emergencias', 'Toca Llamar y confirma. Los números quedan visibles para marcarlos desde otro teléfono.') +
   `${secH('Contactos de emergencia')}
   <div class="group">${D.contacts.map(c => contactRow(c)).join('')}</div>
-  ${crit.length ? `<div class="grp-h"><span class="pdot crit"></span>Incidentes críticos abiertos<span class="n num">${crit.length}</span></div><div class="group">${crit.map(incRow).join('')}</div>` : ''}
   <div class="grp-h"><span class="pdot crit"></span>Protocolos de emergencia</div>
   <div class="group">${D.protocols.filter(p => p.pr === 'crit').map(protoRow).join('')}</div>`;
+
+PAGES.directorio = () => {
+  const list = (window.DIRECTORY || []).slice().sort((a, b) => (a.role === 'Operador') - (b.role === 'Operador') || (a.name + ' ' + a.last).localeCompare(b.name + ' ' + b.last, 'es'));
+  const sites = [...new Set(list.map(p => p.site))];
+  const initials = p => (p.name[0] + (p.last[0] || '')).toUpperCase();
+  return topbar('Directorio de operadores', `${list.length} personas · ${list.filter(p => p.phone).length} con teléfono`) +
+  searchBox('Nombre, teléfono o site', 'dir-search') +
+  `<div class="tabs" role="group" aria-label="Filtrar por site"><button data-a="prf" data-v="all" aria-pressed="true">Todos</button>${sites.map(s => `<button data-a="prf" data-v="${s}" aria-pressed="false">${s === 'LRD' ? 'Nuevo Laredo' : s === 'MTY' ? 'Monterrey' : s}</button>`).join('')}</div>
+  <div class="group" style="margin-top:14px">${list.map(p => `<div class="li" data-pr="${p.site}" data-s="${esc((p.name + ' ' + p.last + ' ' + p.phone + ' ' + p.phone.replace(/\D/g, '') + ' ' + p.role + ' ' + p.site).toLowerCase())}">
+    <span class="avatar dir-av" aria-hidden="true">${esc(initials(p))}</span>
+    <span class="body"><span class="ttl">${esc(p.name)} ${esc(p.last)}</span><span class="sub">${esc(p.role)} · ${esc(p.site)}</span>${p.phone ? `<span class="sub tel">${esc(p.phone)}</span>` : '<span class="sub">Sin teléfono registrado</span>'}</span>
+    ${p.phone ? `<button class="call neutral" data-a="dial" data-name="${esc(p.name + ' ' + p.last)}" data-num="${esc(p.phone)}">Llamar</button>` : ''}</div>`).join('')}</div>
+  ${emptyBox('No hay operadores con ese nombre, teléfono o site.')}`;
 };
 
 PAGES.seguros = () => topbar('Seguros', `${D.policies.length} pólizas`) +
@@ -322,74 +227,24 @@ PAGES.seguros = () => topbar('Seguros', `${D.policies.length} pólizas`) +
     <div class="opt" style="margin-top:12px"><div class="grow"><b>Reportar siniestro</b><span class="tel">${esc(p.phone)}</span></div>${callBtn(p.insurer + ' · siniestros', p.phone)}</div>
   </section>`).join('');
 
-PAGES.horarios = () => {
-  const out = sortInc(incs().filter(i => i.protocol === 'P-05' && i.status !== 'cerrada'));
-  return topbar('Horarios de circulación', `${out.length} incidentes fuera de horario`) +
-  (out.length ? grouped(out, incRow, '') : '') +
-  secH('Reglas', 'Ejemplos: reemplazar por la normativa vigente') +
-  `<div class="group">${D.schedules.map(s => `<div class="li">${ic('clock', 'c-time', true)}<span class="body"><span class="ttl">${esc(s.name)}</span><span class="sub num">${esc(s.window)} · ${esc(s.where)}</span><span class="sub" style="color:var(--ink-2)">${esc(s.rule)}</span></span></div>`).join('')}</div>`;
-};
+PAGES.horarios = () => topbar('Horarios de circulación', `${D.schedules.length} restricciones de horario`) +
+  secH('Restricciones de horario', 'Ejemplos: reemplazar por la normativa vigente') +
+  `<div class="group">${D.schedules.map(s => `<div class="li">${ic('clock', 'c-time', true)}<span class="body"><span class="ttl">${esc(s.name)}</span><span class="sub num">${esc(s.window)} · ${esc(s.where)}</span><span class="sub" style="color:var(--ink-2)">${esc(s.rule)}</span></span></div>`).join('')}</div>
+`;
 
-PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas · ${counts().zone} incidentes abiertos`) +
+PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas registradas`) +
   D.zones.map(z => {
-    const inside = sortInc(incs().filter(i => i.zone === z.id && i.status !== 'cerrada'));
     const alto = z.level === 'alto';
     const tag = alto ? `<span class="pr pr-crit">${svg('alert', 2.6)}Riesgo alto</span>` : `<span class="pr pr-med">${svg('diamond', 2.6)}Riesgo medio</span>`;
     return `<section class="card" style="margin-top:14px"><h3>${ic('zone', alto ? 't-crit' : 't-med', true)}<span style="flex:1;min-width:0">${esc(z.name)}<small style="display:block;font-size:13px;color:var(--ink-3);font-weight:500">${z.id} · ${esc(z.state)}</small></span></h3>
       <div style="margin-bottom:12px">${tag}</div>
       <div class="kv"><div><small>Mayor riesgo</small><b class="num">${esc(z.window)}</b></div><div><small>Tipo de riesgo</small><b>${esc(z.risk)}</b></div>
-      <div class="full"><small>Indicación</small><b>${esc(z.advice)}</b></div>
-      <div class="full"><small>Incidentes abiertos en la zona</small>${inside.length ? `<div class="units-mini">${inside.map(i => `<a href="#incidente-${i.id}">${folio(i.id)} · ${esc(i.v.unit)}</a>`).join('')}</div>` : '<b>Ninguno</b>'}</div></div></section>`;
-  }).join('');
+      <div class="full"><small>Indicación</small><b>${esc(z.advice)}</b></div></div></section>`;
+  }).join('') +
+  `${secH('Protocolo relacionado')}<div class="group">${protoRow(proto('P-06'))}</div>`;
 
-PAGES.bitacora = (tab) => {
-  tab = tab === 'relevo' ? 'relevo' : 'bitacora';
-  const sh = shift(), c = counts();
-  const t = (k, l) => `<button role="tab" aria-selected="${tab === k}" data-a="go" data-to="${k === 'bitacora' ? 'bitacora' : 'bitacora-relevo'}">${l}</button>`;
-  let body;
-  if (tab === 'bitacora') {
-    body = `<section class="card"><h3>${ic('log', 'c-log')}Nueva entrada</h3>
-      <form class="note" data-form="log" style="margin:0"><select id="log-cat" aria-label="Categoría"><option>Novedad</option><option>Llamada</option><option>Incidente</option><option>Relevo</option></select>
-      <input id="log-text" placeholder="Qué pasó" aria-label="Texto de la entrada" autocomplete="off"><button type="submit">Agregar</button></form></section>
-      ${searchBox('Buscar en la bitácora', 'log-search')}
-      ${secH('Registro del turno', S.log.length)}
-      <div class="group">${S.log.slice().sort((a, b) => b.t - a.t).map(e => { const g = LOGIC[e.cat] || LOGIC.Novedad; return `<div class="li" data-s="${esc((e.cat + ' ' + e.text).toLowerCase())}">${ic(g[0], g[1], true)}<span class="body"><span class="sub" style="margin:0 0 2px;font-weight:600;color:var(--ink-2)">${esc(e.cat)}</span><span style="display:block;font-size:15px">${esc(e.text)}</span></span><span class="end num" style="align-self:flex-start">${hhmm(e.t)}</span></div>`; }).join('')}</div>
-      ${emptyBox('Sin entradas con ese texto.')}`;
-  } else {
-    const open = sortInc(incs().filter(i => i.status !== 'cerrada'));
-    const done = S.handover.filter(Boolean).length;
-    body = `<section class="banner"><div class="head">${ic('users', 'c-proto', true)}<div class="tags"><span class="pr pr-info">${svg('clock', 2.6)}Relevo ${sh.next}</span><span class="pr pr-muted num">${done} de ${D.handover.length} listos</span></div></div>
-      <h2>Entrega del turno ${esc(sh.name)}</h2><div class="meta"><span>${c.open} incidentes abiertos</span><span>${c.signal} sin comunicación</span></div></section>
-      <section class="card"><h3>${ic('check', 'c-rep')}Lista de entrega</h3><ul class="steps">${D.handover.map((h, k) => `<li><button role="checkbox" aria-checked="${!!S.handover[k]}" data-a="hstep" data-k="${k}"><span class="box">${svg('check', 3)}</span><span class="txt">${esc(h)}</span></button></li>`).join('')}</ul></section>
-      ${secH('Pendientes que se entregan', open.length)}${grouped(open, incRow, 'Sin pendientes.')}
-      <div class="actions"><button class="act primary" data-a="handover">${ic('send', '')}<span class="grow">Entregar turno<small>Comparte el resumen y lo registra en bitácora</small></span></button></div>`;
-  }
-  return topbar('Bitácora y relevo', `Turno ${sh.name} · relevo ${sh.next}`) + `<div class="tabs" role="tablist">${t('bitacora', 'Bitácora')}${t('relevo', 'Relevo')}</div>` + body;
-};
-
-function shiftSummary() {
-  const all = incs(), c = counts(), sh = shift();
-  const lines = [`Resumen del turno ${sh.name} · ${D.company.name}`, `Monitorista: ${D.user.name}`, `Fecha: ${new Date().toLocaleString('es-MX')}`, '',
-    `Incidentes abiertos: ${c.open} (críticos: ${c.crit})`, `Cerrados: ${c.closed}`, `Sin comunicación: ${c.signal}`, `Fuera de horario: ${c.horario}`, '', 'Abiertos:'];
-  sortInc(all.filter(i => i.status !== 'cerrada')).forEach(i => lines.push(`- ${i.id} [${PR[i.pr][0]}] ${i.title} · ${i.v.unit} · ${INC_STATUS[i.status][0]}`));
-  return lines.join('\n');
-}
-
-PAGES.reportes = () => {
-  const all = incs(), c = counts();
-  const byType = D.protocols.map(p => [p, all.filter(i => i.protocol === p.id).length]).filter(x => x[1]).sort((a, b) => b[1] - a[1]);
-  return topbar('Reportes', `Turno ${shift().name}`) +
-  `<section class="card" style="margin-top:14px"><h3>${ic('rep', 'c-rep')}Resumen del turno</h3><div class="kv">
-    <div><small>Incidentes</small><b class="num">${all.length}</b></div><div><small>Abiertos</small><b class="num">${c.open}</b></div>
-    <div><small>Críticos abiertos</small><b class="num">${c.crit}</b></div><div><small>Cerrados</small><b class="num">${c.closed}</b></div>
-    <div><small>Sin comunicación</small><b class="num">${c.signal} abiertos</b></div><div><small>Fuera de horario</small><b class="num">${c.horario} abiertos</b></div>
-  </div></section>
-  ${secH('Incidentes por tipo')}
-  <div class="group">${byType.map(([p, n]) => `<a class="li" href="#protocolo-${p.id}">${evIc(p.id, p.pr)}<span class="body"><span class="ttl">${esc(p.name)}</span><span class="sub">Prioridad ${PR[p.pr][0].toLowerCase()} · ${p.id}</span></span><span class="end num" style="font-size:17px;font-weight:700;color:var(--ink)">${n}</span></a>`).join('')}</div>
-  <div class="actions"><button class="act primary" data-a="sharesummary">${ic('send', '')}<span class="grow">Compartir resumen del turno<small>Requiere confirmación</small></span></button></div>
-  ${secH('Reportes anteriores', 'Ejemplo')}
-  <div class="group">${D.pastReports.map(r => `<div class="li">${ic('rep', 'c-rep', true)}<span class="body"><span class="ttl">${esc(r[0])}</span><span class="sub">${esc(r[1])}</span></span></div>`).join('')}</div>`;
-};
+PAGES.reportes = () => `${topbar('Reportes', `Turno ${shift().name}`)}
+  <div class="empty" style="margin-top:14px">Esta sección está vacía por ahora.</div>`;
 
 PAGES.config = () => {
   const seg = (v, l) => `<button data-a="theme" data-v="${v}" aria-pressed="${S.settings.theme === v}">${l}</button>`;
@@ -402,10 +257,9 @@ PAGES.config = () => {
   <section class="card"><h3>${ic('download', 'c-unit')}Instalar en el teléfono</h3><div data-install-info></div></section>
   <section class="card"><h3>${ic('user', 'c-log')}Perfil</h3><div class="kv"><div><small>Nombre</small><b>${esc(D.user.name)}</b></div><div><small>Rol</small><b>${esc(D.user.role)}</b></div><div><small>Turno</small><b>${esc(D.user.shift)}</b></div><div><small>Empresa</small><b>${esc(D.company.name)}</b></div></div></section>
   <section class="card"><h3>${ic('info', 'c-cfg')}Modo demostración</h3>
-    <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios. Lo que registras se guarda solo en este teléfono.</p>
-    <button class="btn ghost" data-a="reset">Restablecer datos de ejemplo</button>
+    <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios.</p>
   </section>
-  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.2 demostración</p>`;
+  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.6 demostración</p>`;
 };
 
 /* ---------- Router ---------- */
@@ -474,6 +328,10 @@ function filterList() {
     el.hidden = !!hide; if (!hide) n++;
   });
   view.querySelectorAll('[data-grp]').forEach(g => { g.hidden = !g.querySelector('[data-s]:not([hidden])'); });
+  view.querySelectorAll('[data-hide-on-search]').forEach(x => { x.hidden = !!q; });
+  view.querySelectorAll('[data-only-search]').forEach(x => { x.hidden = !q; });
+  if (q) view.querySelectorAll('.group').forEach(g => { const has = g.querySelector('[data-s]'); if (has) { const sec = g.previousElementSibling; const vis = !!g.querySelector('[data-s]:not([hidden])'); g.hidden = !vis; if (sec && sec.classList.contains('sec-h')) sec.hidden = !vis; } });
+  else view.querySelectorAll('.group, .sec-h').forEach(g => { g.hidden = false; });
   const e = view.querySelector('[data-empty]'); if (e) e.hidden = !any || n > 0;
 }
 
@@ -486,88 +344,26 @@ app.addEventListener('click', async (e) => {
   else if (a === 'close') setMenu(false);
   else if (a === 'go') location.hash = b.dataset.to;
   else if (a === 'prf') { view.querySelectorAll('[data-a="prf"]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); filterList(); }
-  else if (a === 'toggle') {
-    if (isTablet() && !app.classList.contains('menu-open')) { location.hash = 'alertas'; return; }
-    subOpen = !subOpen; b.setAttribute('aria-expanded', String(subOpen)); b.nextElementSibling.classList.toggle('open', subOpen);
-  }
   else if (a === 'sos') {
     openSheet(`<h3>Emergencias</h3><p>Elige a quién llamar. La llamada empieza solo al tocar <b>Llamar</b>.</p>
       ${D.contacts.slice(0, 2).concat(D.contacts.filter(c => !c.public)).slice(0, 4).map(c => `<div class="opt">${ic(c.icon, c.public ? 'c-sos' : 'c-unit', true)}<div class="grow"><b>${esc(c.name)}</b><span class="tel">${esc(c.number)}</span></div><button class="call" data-a="dialnow" data-name="${esc(c.name)}" data-num="${esc(c.number)}">Llamar</button></div>`).join('')}
       <a class="link" href="#emergencias">Ver todos los contactos ${svg('chev')}</a>`);
   }
   else if (a === 'dial') {
-    openSheet(`<h3>¿Llamar a ${esc(b.dataset.name)}?</h3><p>Se abrirá el marcador del teléfono y la llamada quedará anotada en la bitácora.</p>
+    openSheet(`<h3>¿Llamar a ${esc(b.dataset.name)}?</h3><p>Se abrirá el marcador del teléfono.</p>
       <div class="opt">${ic('phone', 'c-rep', true)}<div class="grow"><b>${esc(b.dataset.name)}</b><span class="tel">${esc(b.dataset.num)}</span></div><button class="call" data-a="dialnow" data-name="${esc(b.dataset.name)}" data-num="${esc(b.dataset.num)}">Llamar</button></div>`);
   }
   else if (a === 'dialnow') {
     const num = b.dataset.num.replace(/[^\d+]/g, '');
-    addLog('Llamada', `${me()} abrió el marcador para llamar a ${b.dataset.name} (${b.dataset.num}).`);
     closeSheet();
     location.href = 'tel:' + num;
     toast(`Abriendo el marcador: ${b.dataset.num}. Si no se abre, márcalo a mano.`);
-    if (current === 'bitacora') refresh();
-  }
-  else if (a === 'report') {
-    const i = inc(b.dataset.inc), u = i.v;
-    const text = `Reporte ${i.id} · ${D.company.name}\nPrioridad: ${PR[i.pr][0]}\n${i.title}\nUnidad ${u.unit} · placa ${u.plate} · operador ${u.driver}\nRuta: ${u.route}\nÚltima posición: ${u.pos}\nEstado: ${INC_STATUS[i.status][0]}\nAbierto: ${hhmm(i.opened)}`;
-    openSheet(`<h3>¿Enviar reporte?</h3><p>Se abrirá la opción de compartir del teléfono para que elijas a quién enviarlo (WhatsApp, correo, etc.).</p>
-      <textarea class="field" readonly rows="7" aria-label="Texto del reporte">${esc(text)}</textarea>
-      <div class="opt" style="border:0"><div class="grow"><b>Cliente y base de origen</b><span class="tel">Tú eliges el destinatario</span></div><button class="call neutral" data-a="sendnow">Enviar</button></div>`,
-      async () => {
-        const r = await shareText(`Reporte ${i.id}`, text);
-        if (r === 'cancel') return;
-        S.inc[i.id].notes.push({ t: Date.now(), text: `${me()} compartió el reporte del incidente.` }); addLog('Incidente', `Reporte de ${i.id} compartido.`);
-        closeSheet(); refresh(); r === 'manual' ? showManual(text) : toast(shareMsg[r]);
-      });
   }
   else if (a === 'sendnow') { if (sheetCb) await sheetCb(); }
-  else if (a === 'take') {
-    const s = S.inc[b.dataset.inc]; s.status = 'atencion'; s.owner = D.user.name;
-    s.notes.push({ t: Date.now(), text: `${me()} tomó el incidente.` }); addLog('Incidente', `${me()} tomó ${b.dataset.inc}.`);
-    save(); refresh(); toast('Incidente asignado a ti.');
-  }
-  else if (a === 'closeinc') {
-    const id = b.dataset.inc;
-    openSheet(`<h3>Cerrar ${id}</h3><p>Escribe cómo se resolvió. La nota queda en la bitácora.</p>
-      <textarea class="field" id="close-note" rows="4" placeholder="Ejemplo: operador contestó, falla de señal en zona sin cobertura."></textarea>
-      <div class="opt" style="border:0"><div class="grow"></div><button class="call neutral" data-a="sendnow">Cerrar incidente</button></div>`,
-      async () => {
-        const note = sheetEl.querySelector('#close-note').value.trim();
-        if (!note) { toast('Escribe la nota de cierre para continuar.'); sheetEl.querySelector('#close-note').focus(); return; }
-        const s = S.inc[id]; s.status = 'cerrada'; s.closedNote = note; s.owner = s.owner || D.user.name;
-        s.notes.push({ t: Date.now(), text: `Cerrado por ${me()}.` }); addLog('Incidente', `${id} cerrado: ${note}`);
-        save(); closeSheet(); refresh(); toast('Incidente cerrado.');
-      });
-  }
-  else if (a === 'step') { const s = S.inc[b.dataset.inc]; const k = +b.dataset.k; s.steps[k] = !s.steps[k]; b.setAttribute('aria-checked', String(!!s.steps[k])); save(); }
-  else if (a === 'hstep') { const k = +b.dataset.k; S.handover[k] = !S.handover[k]; save(); refresh(); }
-  else if (a === 'handover') {
-    const text = shiftSummary();
-    openSheet(`<h3>¿Entregar turno?</h3><p>Comparte el resumen con quien recibe el turno. Se anotará en la bitácora.</p>
-      <textarea class="field" readonly rows="8" aria-label="Resumen del turno">${esc(text)}</textarea>
-      <div class="opt" style="border:0"><div class="grow">${S.handover.every(Boolean) ? '' : '<span class="pr pr-high">' + svg('excl', 2.6) + 'Lista incompleta</span>'}</div><button class="call neutral" data-a="sendnow">Entregar</button></div>`,
-      async () => {
-        const r = await shareText('Relevo de turno', text);
-        if (r === 'cancel') return;
-        addLog('Relevo', `${me()} entregó el turno ${shift().name}.`); closeSheet(); refresh();
-        r === 'manual' ? showManual(text) : toast(shareMsg[r]);
-      });
-  }
-  else if (a === 'sharesummary') {
-    const text = shiftSummary();
-    openSheet(`<h3>¿Compartir resumen?</h3><p>Elige a quién enviarlo en el siguiente paso.</p><textarea class="field" readonly rows="8" aria-label="Resumen del turno">${esc(text)}</textarea>
-      <div class="opt" style="border:0"><div class="grow"></div><button class="call neutral" data-a="sendnow">Compartir</button></div>`,
-      async () => { const r = await shareText('Resumen del turno', text); if (r === 'cancel') return; closeSheet(); r === 'manual' ? showManual(text) : toast(shareMsg[r]); });
-  }
   else if (a === 'night') setTheme(isDark() ? 'light' : 'dark');
   else if (a === 'theme') setTheme(b.dataset.v);
   else if (a === 'big') { S.settings.big = !S.settings.big; save(); applySettings(); refresh(); }
   else if (a === 'rm') { S.settings.rm = !S.settings.rm; save(); applySettings(); refresh(); }
-  else if (a === 'reset') {
-    openSheet(`<h3>¿Restablecer datos de ejemplo?</h3><p>Se borran las notas, cierres y entradas de bitácora que hiciste en este teléfono.</p>
-      <div class="opt" style="border:0"><div class="grow"></div><button class="call" data-a="sendnow">Restablecer</button></div>`,
-      async () => { const st = S.settings; S = freshState(); S.settings = st; save(); closeSheet(); location.hash = 'inicio'; render(); toast('Datos de ejemplo restablecidos.'); });
-  }
   else if (a === 'install') {
     if (deferredPrompt) { deferredPrompt.prompt(); const r = await deferredPrompt.userChoice; deferredPrompt = null; if (r.outcome === 'accepted') toast('Instalando Centinela…'); paintInstall(); }
   }
@@ -587,14 +383,6 @@ app.addEventListener('input', (e) => {
 app.addEventListener('submit', (e) => {
   e.preventDefault();
   const f = e.target, kind = f.dataset.form;
-  if (kind === 'incnote') {
-    const inp = f.querySelector('input'), v = inp.value.trim(); if (!v) return;
-    S.inc[f.dataset.inc].notes.push({ t: Date.now(), text: `${me()}: ${v}` }); addLog('Incidente', `${f.dataset.inc}: ${v}`);
-    save(); refresh(); toast('Nota agregada.');
-  } else if (kind === 'log') {
-    const v = f.querySelector('#log-text').value.trim(); if (!v) return;
-    addLog(f.querySelector('#log-cat').value, `${me()}: ${v}`); refresh(); toast('Entrada agregada a la bitácora.');
-  }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); setMenu(false); } });
 

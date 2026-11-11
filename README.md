@@ -1,16 +1,17 @@
 # APP-MONITOREO-
 
-Centinela: app de monitoreo de alertas e incidentes para teléfonos Android, iPhone y tabletas.
+Centinela: app de consulta para el turno de monitoreo (protocolos, emergencias, seguros, horarios y zonas de riesgo) para teléfonos Android, iPhone y tabletas.
 
 ## App (`app/`)
 
 App web instalable (PWA), sin paso de compilación: HTML, CSS y JavaScript.
 
 - `index.html`, `styles.css`, `app.js`: interfaz y lógica.
-- `data.js`: **datos de ejemplo** (incidentes, protocolos, contactos, pólizas, horarios, zonas). La app no administra unidades: cada incidente solo trae los datos del vehículo involucrado como referencia.
+- `directorio.js`: directorio de operadores (datos reales, publicados con autorización).
+- `data.js`: **datos de ejemplo** (protocolos, contactos, pólizas, horarios, zonas). La app no administra unidades, incidentes ni bitácora.
 - `manifest.webmanifest`, `sw.js`, `icons/`: instalación y funcionamiento sin red.
 
-Secciones: Inicio, Alertas e incidentes, Protocolos, Emergencias, Seguros, Horarios de circulación, Zonas de riesgo, Bitácora y relevo, Reportes, Configuración.
+Secciones: Inicio, Protocolos, Emergencias, Directorio de operadores, Seguros, Horarios de circulación, Zonas de riesgo, Reportes (vacía por ahora), Configuración.
 
 Probar en local:
 
@@ -30,8 +31,7 @@ cd app && python3 -m http.server 8000
 
 ## Estado
 
-Modo demostración: no está conectada a GPS, base de datos ni usuarios reales. Las notas, cierres y bitácora se guardan solo en el teléfono.
-Las llamadas abren el marcador del teléfono después de confirmar; los reportes se comparten con la opción de compartir del teléfono.
+Modo demostración: no está conectada a GPS, base de datos ni usuarios reales. Las llamadas abren el marcador del teléfono después de confirmar.
 
 ## Diseño
 
