@@ -83,8 +83,8 @@ window.DATA = {
     { name: '911 · Emergencias', number: '911', note: 'Policía, ambulancia y bomberos', icon: 'sos', public: true },
     { name: '088 · Guardia Nacional', number: '088', note: 'Seguridad en carreteras federales', icon: 'shield', public: true },
     { name: '089 · Denuncia anónima', number: '089', note: 'Reportes sin identificarse', icon: 'phone', public: true },
-    { name: '078 · Ángeles Verdes', number: '078', note: 'Auxilio mecánico en carretera', icon: 'truck', public: true },
-    { name: 'Cabina de monitoreo', number: '720 476 5054', note: 'Cabina interna', icon: 'phone' },
+    { name: '078 · Ángeles Verdes', number: '078', note: 'Auxilio mecánico en carretera', icon: 'tool', public: true },
+    { name: 'Cabina de monitoreo', number: '720 476 5054', note: 'Cabina interna', icon: 'headset' },
     { name: 'Quálitas · siniestros', number: '800 800 2880', note: 'Reporte de siniestros, todo el país', icon: 'shield' },
     { name: 'Gerente de operaciones', number: '+52 442 000 0001', note: 'Número de ejemplo', icon: 'user' }
   ],
