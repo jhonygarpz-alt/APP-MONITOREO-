@@ -44,14 +44,6 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const PR = { crit: ['CRÍTICA', 'alert'], high: ['ALTA', 'excl'], med: ['MEDIA', 'diamond'] };
 const prTag = p => `<span class="pr pr-${p}">${svg(PR[p][1], 2.6)}${PR[p][0]}</span>`;
 const PR_ORDER = { crit: 0, high: 1, med: 2 };
-const STATUS = {
-  senal:   { tag: 'off',  label: 'SIN SEÑAL',        icon: 'off',     filter: 'Sin señal' },
-  horario: { tag: 'high', label: 'FUERA DE HORARIO', icon: 'clock',   filter: 'Fuera de horario' },
-  detenida:{ tag: 'high', label: 'DETENIDA',         icon: 'pause',   filter: 'Detenidas' },
-  zona:    { tag: 'med',  label: 'ZONA DE RIESGO',   icon: 'diamond', filter: 'Zona de riesgo' },
-  ruta:    { tag: 'ok',   label: 'EN RUTA',          icon: 'check',   filter: 'En ruta' }
-};
-const unitTag = u => { const s = STATUS[u.status]; const label = u.status === 'senal' ? `SIN SEÑAL ${u.signalMin} MIN` : s.label; return `<span class="pr pr-${s.tag}">${svg(s.icon, 2.6)}${label}</span>`; };
 const INC_STATUS = { activa: ['Sin atender', 'pr-crit'], atencion: ['En atención', 'pr-info'], cerrada: ['Cerrado', 'pr-muted'] };
 
 /* ---------- Estado persistente ---------- */
@@ -70,7 +62,6 @@ try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
 if (!S || !S.inc || !S.settings) S = freshState();
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
-const unit = id => D.units.find(u => u.id === id);
 const incs = () => D.incidents.map(i => Object.assign({}, i, S.inc[i.id], { opened: S.t0 - i.openedMin * 60000 }));
 const inc = id => incs().find(i => i.id === id);
 const proto = id => D.protocols.find(p => p.id === id);
@@ -96,9 +87,9 @@ function counts() {
     closed: all.filter(i => i.status === 'cerrada').length,
     crit: open.filter(i => i.pr === 'crit').length,
     critPending: all.filter(i => i.status === 'activa' && i.pr === 'crit').length,
-    signal: D.units.filter(u => u.status === 'senal').length,
-    horario: D.units.filter(u => u.status === 'horario').length,
-    zone: D.units.filter(u => u.zone).length
+    signal: open.filter(i => i.protocol === 'P-03').length,
+    horario: open.filter(i => i.protocol === 'P-05').length,
+    zone: open.filter(i => i.zone).length
   };
 }
 function addLog(cat, text) { S.log.unshift({ t: Date.now(), cat, text }); save(); }
@@ -107,7 +98,6 @@ function addLog(cat, text) { S.log.unshift({ t: Date.now(), cat, text }); save()
 const NAV = [
   ['Operación'],
   ['inicio', 'Inicio', 'home', 'c-home'],
-  ['unidades', 'Unidades y viajes', 'truck', 'c-unit', () => ({ n: D.units.length })],
   ['alertas', 'Alertas e incidentes', 'alert', 'c-alert', () => { const c = counts(); return { n: c.open, cls: c.openCrit ? 'crit' : 'warn' }; }, true],
   ['protocolos', 'Protocolos', 'proto', 'c-proto'],
   ['emergencias', 'Emergencias', 'sos', 'c-sos'],
@@ -119,7 +109,7 @@ const NAV = [
   ['reportes', 'Reportes', 'rep', 'c-rep'],
   ['config', 'Configuración', 'cfg', 'c-cfg']
 ];
-const PARENT = { unidad: 'unidades', incidente: 'alertas', protocolo: 'protocolos' };
+const PARENT = { incidente: 'alertas', protocolo: 'protocolos' };
 
 const app = document.getElementById('app');
 const view = document.getElementById('view');
@@ -183,18 +173,14 @@ function topbar(title, sub, back) {
 }
 const secH = (t, s) => `<div class="sec-h"><h2>${t}</h2>${s ? `<span>${s}</span>` : ''}</div>`;
 function incRow(i) {
-  const u = unit(i.unit);
+  const u = i.v;
   const icn = i.pr === 'crit' ? ['alert', 'c-alert'] : i.pr === 'high' ? ['clock', 'c-time'] : ['zone', 'c-zone'];
   const st = INC_STATUS[i.status];
-  return `<a class="alert opaque ${i.pr === 'crit' && i.status !== 'cerrada' ? 'crit' : ''}" href="#incidente-${i.id}" data-s="${esc([i.id, u.id, u.plate, u.driver, i.title].join(' ').toLowerCase())}" style="color:inherit">
+  return `<a class="alert opaque ${i.pr === 'crit' && i.status !== 'cerrada' ? 'crit' : ''}" href="#incidente-${i.id}" data-s="${esc([i.id, u.unit, u.plate, u.driver, i.title].join(' ').toLowerCase())}" style="color:inherit">
     ${ic(icn[0], icn[1])}
     <span><span class="row1">${prTag(i.pr)}${i.status !== 'activa' ? `<span class="pr ${st[1]}">${st[0]}</span>` : ''}<span class="meta num" style="margin:0">${i.id}</span></span>
-    <span class="ttl">${esc(i.title)}</span><span class="meta">${u.id} · ${u.plate} · ${esc(u.driver)} · ${ago(i.opened)}</span></span>
+    <span class="ttl">${esc(i.title)}</span><span class="meta">${u.unit} · ${u.plate} · ${esc(u.driver)} · ${ago(i.opened)}</span></span>
     ${svg('chev', 2, 'chev')}</a>`;
-}
-function unitRow(u) {
-  return `<a class="unit glass" href="#unidad-${u.id}" data-s="${esc([u.id, u.plate, u.driver, u.route, STATUS[u.status].label, u.trip].join(' ').toLowerCase())}" data-st="${u.status}" style="color:inherit">
-    ${ic('truck', 'c-unit')}<div class="grow"><div class="u">${u.id} <span class="m num">· ${u.plate}</span></div><div class="m">${esc(u.driver)} · ${esc(u.route)}</div></div>${unitTag(u)}</a>`;
 }
 const searchBox = (ph, id) => `<label class="search glass">${svg('search')}<input type="search" id="${id}" data-a="filter" placeholder="${ph}" aria-label="${ph}" autocomplete="off"></label>`;
 const emptyBox = t => `<div class="empty glass" data-empty hidden>${t}</div>`;
@@ -208,7 +194,7 @@ PAGES.inicio = () => {
   const att = sortInc(incs().filter(i => i.status !== 'cerrada'));
   return topbar('Inicio', `${esc(D.company.name)} · Turno ${shift().name.toLowerCase()}`) +
   `<div data-install-slot></div>
-  ${searchBox('Unidad, placa, operador o folio', 'home-search')}
+  ${searchBox('Folio, unidad, placa u operador', 'home-search')}
   <div class="pulse">
     <span class="chip"><span data-net></span></span>
     <span class="chip num">Actualizado hace <span data-tick>0</span> s</span>
@@ -216,51 +202,14 @@ PAGES.inicio = () => {
     <span class="chip demo">${svg('info', 2.4).replace('<svg', '<svg width="13" height="13"')}Datos de ejemplo</span>
   </div>
   <div class="kpis">
-    <a class="kpi glass" href="#unidades" style="color:inherit;text-decoration:none"><div class="top">${ic('truck', 'c-unit', true)}<span class="pr pr-ok">${svg('check', 2.6)}OK</span></div><div class="v num">${D.units.length}</div><div><div class="l">Unidades activas</div><div class="s">${D.units.filter(u => u.status === 'ruta').length} en ruta normal</div></div></a>
-    <a class="kpi is-crit" href="#unidades-senal" style="color:inherit;text-decoration:none"><div class="top">${ic('off', 'c-alert', true)}${prTag('crit')}</div><div class="v num">${c.signal}</div><div><div class="l">Sin comunicación</div><div class="s">más de 5 min sin señal</div></div></a>
-    <a class="kpi is-high" href="#unidades-horario" style="color:inherit;text-decoration:none"><div class="top">${ic('clock', 'c-time', true)}${prTag('high')}</div><div class="v num">${c.horario}</div><div><div class="l">Viajes fuera de horario</div><div class="s">restricción 23:00 – 05:00</div></div></a>
-    <a class="kpi ${c.crit ? 'is-crit' : 'glass'}" href="#alertas" style="color:inherit;text-decoration:none"><div class="top">${ic('alert', 'c-sos', true)}${c.crit ? prTag('crit') : ''}</div><div class="v num">${c.crit}</div><div><div class="l">Alertas críticas</div><div class="s">sin atender: ${c.critPending}</div></div></a>
+    <a class="kpi glass" href="#alertas" style="color:inherit;text-decoration:none"><div class="top">${ic('alert', 'c-unit', true)}<span class="pr pr-info">${svg('info', 2.6)}ABIERTOS</span></div><div class="v num">${c.open}</div><div><div class="l">Incidentes abiertos</div><div class="s">${c.pending} sin atender</div></div></a>
+    <a class="kpi ${c.signal ? 'is-crit' : 'glass'}" href="#protocolo-P-03" style="color:inherit;text-decoration:none"><div class="top">${ic('off', 'c-alert', true)}${c.signal ? prTag('crit') : ''}</div><div class="v num">${c.signal}</div><div><div class="l">Sin comunicación</div><div class="s">incidentes abiertos</div></div></a>
+    <a class="kpi ${c.horario ? 'is-high' : 'glass'}" href="#horarios" style="color:inherit;text-decoration:none"><div class="top">${ic('clock', 'c-time', true)}${c.horario ? prTag('high') : ''}</div><div class="v num">${c.horario}</div><div><div class="l">Fuera de horario</div><div class="s">restricción 23:00 – 05:00</div></div></a>
+    <a class="kpi ${c.crit ? 'is-crit' : 'glass'}" href="#emergencias" style="color:inherit;text-decoration:none"><div class="top">${ic('alert', 'c-sos', true)}${c.crit ? prTag('crit') : ''}</div><div class="v num">${c.crit}</div><div><div class="l">Alertas críticas</div><div class="s">sin atender: ${c.critPending}</div></div></a>
   </div>
   ${secH('Requieren atención', 'Ordenadas por prioridad')}
   <div class="list">${att.map(incRow).join('') || '<div class="empty glass">No hay incidentes abiertos.</div>'}</div>
-  ${secH('Unidades', `${D.units.length} en operación`)}
-  <div class="list">${D.units.map(unitRow).join('')}</div>
-  ${emptyBox('Sin resultados. Prueba con otra unidad, placa, operador o folio.')}`;
-};
-
-PAGES.unidades = (f) => {
-  f = f && STATUS[f] ? f : 'todas';
-  const btn = (k, l) => `<button data-a="ufilter" data-f="${k}" aria-pressed="${f === k}">${l}</button>`;
-  return topbar('Unidades y viajes', `${D.units.length} unidades en operación`) +
-  searchBox('Unidad, placa, operador o viaje', 'units-search') +
-  `<div class="filters" role="group" aria-label="Filtrar por estado">${btn('todas', 'Todas')}${Object.entries(STATUS).map(([k, s]) => btn(k, s.filter)).join('')}</div>
-  <div class="list" style="margin-top:6px">${D.units.slice().sort((a, b) => (a.status === 'ruta') - (b.status === 'ruta')).map(unitRow).join('')}</div>
-  ${emptyBox('No hay unidades con ese filtro o búsqueda.')}`;
-};
-
-PAGES.unidad = (id) => {
-  const u = unit(id); if (!u) return PAGES.unidades();
-  const s = STATUS[u.status];
-  const bcls = s.tag === 'off' ? 'b-crit' : s.tag === 'high' ? 'b-high' : s.tag === 'med' ? 'b-med' : 'b-ok';
-  const open = sortInc(incs().filter(i => i.unit === u.id && i.status !== 'cerrada'));
-  const pol = D.policies.find(p => p.units.includes(u.id));
-  const z = u.zone && D.zones.find(z => z.id === u.zone);
-  return topbar(u.id, `${u.plate} · ${esc(u.driver)}`, 'unidades') +
-  `<section class="banner ${bcls}"><div class="tags">${unitTag(u)}<span class="num" style="font-size:12px;font-weight:700">${u.speed} km/h</span></div>
-    <h2>${esc(u.route)}</h2><div class="meta"><span>Viaje ${u.trip}</span><span>ETA ${u.eta}</span></div></section>
-  <div class="actions">
-    <button class="act primary" data-a="dial" data-name="${esc(u.driver)}" data-num="${esc(u.phone)}">${ic('phone', 'c-rep')}<span class="grow">Llamar al operador<small>Se confirma antes de marcar</small></span></button>
-    <a class="act opaque" href="https://www.google.com/maps?q=${u.lat},${u.lng}" target="_blank" rel="noopener">${ic('map', 'c-unit')}<span class="grow">Abrir ubicación en Mapas<small>Última posición registrada</small></span></a>
-  </div>
-  <section class="card opaque"><h3>${ic('truck', 'c-unit')}Unidad y viaje</h3><div class="kv">
-    <div><small>Placa</small><b class="num">${u.plate}</b></div><div><small>Operador</small><b>${esc(u.driver)}</b></div>
-    <div><small>Cliente</small><b>${esc(u.client)}</b></div><div><small>Carga</small><b>${esc(u.cargo)}</b></div>
-    <div class="full"><small>Última posición</small><b>${esc(u.pos)}</b></div>
-    <div><small>Última señal</small><b class="num">${hhmm(S.t0 - u.signalMin * 60000)}</b></div><div><small>Teléfono</small><b class="num tel">${esc(u.phone)}</b></div>
-  </div></section>
-  ${open.length ? secH('Incidentes abiertos', open.length) + `<div class="list">${open.map(incRow).join('')}</div>` : ''}
-  ${z ? `<section class="card opaque"><h3>${ic('zone', 'c-zone')}Dentro de zona de riesgo</h3><p><b>${z.id} · ${esc(z.name)}</b>. ${esc(z.risk)}. ${esc(z.advice)}</p><a class="link" href="#zonas">Ver zonas de riesgo ${svg('chev')}</a></section>` : ''}
-  ${pol ? `<section class="card opaque"><h3>${ic('shield', 'c-ins')}Seguro</h3><div class="kv"><div><small>Póliza</small><b class="num">${pol.id}</b></div><div><small>Vigencia</small><b>${pol.to}</b></div><div class="full"><small>Cobertura</small><b>${esc(pol.type)}</b></div></div><a class="link" href="#seguros">Ver seguros ${svg('chev')}</a></section>` : ''}`;
+  ${emptyBox('Sin resultados. Prueba con otro folio, unidad, placa u operador.')}`;
 };
 
 PAGES.alertas = (tab) => {
@@ -278,7 +227,7 @@ PAGES.alertas = (tab) => {
 
 PAGES.incidente = (id) => {
   const i = inc(id); if (!i) return PAGES.alertas();
-  const u = unit(i.unit), p = proto(i.protocol), st = INC_STATUS[i.status];
+  const u = i.v, p = proto(i.protocol), st = INC_STATUS[i.status];
   const steps = p.steps.map((s, k) => `<li><button role="checkbox" aria-checked="${!!i.steps[k]}" data-a="step" data-inc="${i.id}" data-k="${k}" ${i.status === 'cerrada' ? 'disabled' : ''}><span class="box">${svg('check', 3)}</span><span class="txt">${esc(s)}</span></button></li>`).join('');
   const ev = [...i.notes.map(n => [n.t, n.text]), ...i.events.map(([m, t]) => [S.t0 - m * 60000, t])].sort((a, b) => b[0] - a[0]);
   const closed = i.status === 'cerrada';
@@ -294,8 +243,8 @@ PAGES.incidente = (id) => {
     <button class="act opaque" data-a="report" data-inc="${i.id}">${ic('send', 'c-unit')}<span class="grow">Enviar reporte<small>Al cliente y a la base · requiere confirmación</small></span></button>
     <button class="act opaque" data-a="closeinc" data-inc="${i.id}">${ic('check', 'c-cfg')}<span class="grow">Cerrar incidente<small>Pide nota de cierre</small></span></button>
   </div>`}
-  <section class="card opaque"><h3>${ic('truck', 'c-unit')}Unidad y viaje</h3><div class="kv">
-    <div><small>Unidad</small><b><a href="#unidad-${u.id}">${u.id}</a></b></div><div><small>Placa</small><b class="num">${u.plate}</b></div>
+  <section class="card opaque"><h3>${ic('truck', 'c-unit')}Vehículo involucrado</h3><div class="kv">
+    <div><small>Unidad</small><b>${esc(u.unit)}</b></div><div><small>Placa</small><b class="num">${u.plate}</b></div>
     <div><small>Operador</small><b>${esc(u.driver)}</b></div><div><small>Viaje</small><b class="num">${u.trip}</b></div>
     <div class="full"><small>Ruta</small><b>${esc(u.route)} · ${esc(u.cargo)}</b></div>
     <div class="full"><small>Última posición</small><b>${esc(u.pos)}</b></div>
@@ -343,29 +292,28 @@ PAGES.seguros = () => topbar('Seguros', `${D.policies.length} pólizas`) +
     <h3>${ic('shield', 'c-ins')}<span class="grow">${esc(p.type)}</span>${p.expiresDays ? `<span class="pr pr-high">${svg('excl', 2.6)}VENCE EN ${p.expiresDays} DÍAS</span>` : `<span class="pr pr-ok">${svg('check', 2.6)}VIGENTE</span>`}</h3>
     <div class="kv"><div><small>Póliza</small><b class="num">${p.id}</b></div><div><small>Aseguradora</small><b>${esc(p.insurer)}</b></div>
     <div><small>Desde</small><b>${p.from}</b></div><div><small>Hasta</small><b>${p.to}</b></div>
-    <div class="full"><small>Deducible</small><b>${esc(p.deductible)}</b></div>
-    <div class="full"><small>Unidades cubiertas</small><div class="units-mini">${p.units.map(id => `<a href="#unidad-${id}">${id}</a>`).join('')}</div></div></div>
+    <div class="full"><small>Deducible</small><b>${esc(p.deductible)}</b></div></div>
     <div class="opt" style="margin-top:10px"><div class="grow"><b>Reportar siniestro</b><span class="tel">${esc(p.phone)}</span></div>${callBtn('Aseguradora · siniestros', p.phone)}</div>
   </section>`).join('');
 
 PAGES.horarios = () => {
-  const out = D.units.filter(u => u.status === 'horario');
-  return topbar('Horarios de circulación', `${out.length} viajes fuera de horario`) +
-  (out.length ? secH('Fuera de horario ahora', out.length) + `<div class="list">${out.map(u => { const i = incs().find(x => x.unit === u.id && x.status !== 'cerrada'); return i ? incRow(i) : unitRow(u); }).join('')}</div>` : '') +
+  const out = sortInc(incs().filter(i => i.protocol === 'P-05' && i.status !== 'cerrada'));
+  return topbar('Horarios de circulación', `${out.length} incidentes fuera de horario`) +
+  (out.length ? secH('Incidentes fuera de horario', out.length) + `<div class="list">${out.map(incRow).join('')}</div>` : '') +
   secH('Reglas', 'Ejemplos: reemplazar por la normativa vigente') +
   `<div class="list">${D.schedules.map(s => `<section class="card opaque" style="margin:0"><h3>${ic('clock', 'c-time')}<span class="grow">${esc(s.name)}</span></h3>
     <div class="kv"><div><small>Horario</small><b class="num">${esc(s.window)}</b></div><div><small>Aplica en</small><b>${esc(s.where)}</b></div><div class="full"><small>Regla</small><b>${esc(s.rule)}</b></div></div></section>`).join('')}</div>`;
 };
 
-PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas · ${counts().zone} unidades dentro`) +
+PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas · ${counts().zone} incidentes abiertos`) +
   `<div class="list" style="margin-top:12px">${D.zones.map(z => {
-    const inside = D.units.filter(u => u.zone === z.id);
+    const inside = sortInc(incs().filter(i => i.zone === z.id && i.status !== 'cerrada'));
     const tag = z.level === 'alto' ? `<span class="pr pr-crit">${svg('alert', 2.6)}RIESGO ALTO</span>` : `<span class="pr pr-med">${svg('diamond', 2.6)}RIESGO MEDIO</span>`;
     return `<section class="card opaque" style="margin:0"><h3>${ic('zone', 'c-zone')}<span class="grow">${z.id} · ${esc(z.name)}</span></h3>
       <div style="margin-bottom:10px">${tag}</div>
       <div class="kv"><div><small>Estado</small><b>${esc(z.state)}</b></div><div><small>Mayor riesgo</small><b class="num">${esc(z.window)}</b></div>
       <div class="full"><small>Tipo de riesgo</small><b>${esc(z.risk)}</b></div><div class="full"><small>Indicación</small><b>${esc(z.advice)}</b></div>
-      <div class="full"><small>Unidades dentro ahora</small>${inside.length ? `<div class="units-mini">${inside.map(u => `<a href="#unidad-${u.id}">${u.id} · ${STATUS[u.status].label.toLowerCase()}</a>`).join('')}</div>` : '<b>Ninguna</b>'}</div></div></section>`;
+      <div class="full"><small>Incidentes abiertos en la zona</small>${inside.length ? `<div class="units-mini">${inside.map(i => `<a href="#incidente-${i.id}">${i.id} · ${esc(i.v.unit)}</a>`).join('')}</div>` : '<b>Ninguno</b>'}</div></div></section>`;
   }).join('')}</div>`;
 
 PAGES.bitacora = (tab) => {
@@ -384,7 +332,7 @@ PAGES.bitacora = (tab) => {
     const open = sortInc(incs().filter(i => i.status !== 'cerrada'));
     const done = S.handover.filter(Boolean).length;
     body = `<section class="banner b-ok"><div class="tags"><span class="pr pr-info">${svg('clock', 2.6)}RELEVO ${sh.next}</span><span class="num" style="font-size:12px;font-weight:600">${done} de ${D.handover.length} listos</span></div>
-      <h2>Entrega del turno ${esc(sh.name)}</h2><div class="meta"><span>${c.open} incidentes abiertos</span><span>${c.signal} unidades sin señal</span></div></section>
+      <h2>Entrega del turno ${esc(sh.name)}</h2><div class="meta"><span>${c.open} incidentes abiertos</span><span>${c.signal} sin comunicación</span></div></section>
       <section class="card opaque"><h3>${ic('check', 'c-rep')}Lista de entrega</h3><ul class="steps">${D.handover.map((h, k) => `<li><button role="checkbox" aria-checked="${!!S.handover[k]}" data-a="hstep" data-k="${k}"><span class="box">${svg('check', 3)}</span><span class="txt">${esc(h)}</span></button></li>`).join('')}</ul></section>
       ${secH('Pendientes que se entregan', open.length)}<div class="list">${open.map(incRow).join('') || '<div class="empty glass">Sin pendientes.</div>'}</div>
       <div class="actions"><button class="act primary" data-a="handover">${ic('send', 'c-log')}<span class="grow">Entregar turno<small>Comparte el resumen y lo registra en bitácora</small></span></button></div>`;
@@ -395,8 +343,8 @@ PAGES.bitacora = (tab) => {
 function shiftSummary() {
   const all = incs(), c = counts(), sh = shift();
   const lines = [`Resumen del turno ${sh.name} · ${D.company.name}`, `Monitorista: ${D.user.name}`, `Fecha: ${new Date().toLocaleString('es-MX')}`, '',
-    `Incidentes abiertos: ${c.open} (críticos: ${c.crit})`, `Cerrados: ${c.closed}`, `Unidades sin comunicación: ${c.signal}`, `Fuera de horario: ${c.horario}`, '', 'Abiertos:'];
-  sortInc(all.filter(i => i.status !== 'cerrada')).forEach(i => lines.push(`- ${i.id} [${PR[i.pr][0]}] ${i.title} · ${i.unit} · ${INC_STATUS[i.status][0]}`));
+    `Incidentes abiertos: ${c.open} (críticos: ${c.crit})`, `Cerrados: ${c.closed}`, `Sin comunicación: ${c.signal}`, `Fuera de horario: ${c.horario}`, '', 'Abiertos:'];
+  sortInc(all.filter(i => i.status !== 'cerrada')).forEach(i => lines.push(`- ${i.id} [${PR[i.pr][0]}] ${i.title} · ${i.v.unit} · ${INC_STATUS[i.status][0]}`));
   return lines.join('\n');
 }
 
@@ -407,7 +355,7 @@ PAGES.reportes = () => {
   `<section class="card opaque" style="margin-top:12px"><h3>${ic('rep', 'c-rep')}Resumen del turno</h3><div class="kv">
     <div><small>Incidentes</small><b class="num">${all.length}</b></div><div><small>Abiertos</small><b class="num">${c.open}</b></div>
     <div><small>Críticos abiertos</small><b class="num">${c.crit}</b></div><div><small>Cerrados</small><b class="num">${c.closed}</b></div>
-    <div><small>Sin comunicación</small><b class="num">${c.signal} unidades</b></div><div><small>Fuera de horario</small><b class="num">${c.horario} viajes</b></div>
+    <div><small>Sin comunicación</small><b class="num">${c.signal} abiertos</b></div><div><small>Fuera de horario</small><b class="num">${c.horario} abiertos</b></div>
   </div></section>
   <section class="card opaque"><h3>${ic('proto', 'c-proto')}Incidentes por tipo</h3>
     ${byType.map(([p, n]) => `<div class="opt"><div class="grow"><b>${esc(p.name)}</b><span class="tel">${p.id}</span></div>${prTag(p.pr)}<b class="num" style="min-width:24px;text-align:right">${n}</b></div>`).join('')}
@@ -431,7 +379,7 @@ PAGES.config = () => {
     <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios. Lo que registras se guarda solo en este teléfono.</p>
     <button class="btn" data-a="reset" style="background:var(--solid-2);color:var(--ink);border:1px solid var(--line-soft)">Restablecer datos de ejemplo</button>
   </section>
-  <p style="text-align:center;color:var(--ink-3);font-size:12px;margin:18px 0 0">${esc(D.company.app)} · versión 1.0 demostración</p>`;
+  <p style="text-align:center;color:var(--ink-3);font-size:12px;margin:18px 0 0">${esc(D.company.app)} · versión 1.1 demostración</p>`;
 };
 
 /* ---------- Router ---------- */
@@ -447,7 +395,6 @@ function render(keepScroll) {
   const top = view.scrollTop;
   if (!keepScroll) view.classList.add('enter');
   view.innerHTML = `<div class="wrap">${PAGES[page](param)}</div>`;
-  if (page === 'unidades' && param && STATUS[param]) applyUnitFilter(param);
   if (keepScroll) view.scrollTop = top; else { view.scrollTop = 0; requestAnimationFrame(() => view.classList.remove('enter')); }
   renderDrawer(); paintNet(); paintInstall(); tick();
   document.title = `${view.querySelector('h1').textContent} · ${D.company.app}`;
@@ -489,19 +436,13 @@ function showManual(text) {
 const shareMsg = { shared: 'Listo para enviar desde la app que elegiste.', copied: 'Texto copiado. Pégalo en el chat o correo del destinatario.' };
 
 /* ---------- Eventos ---------- */
-function applyUnitFilter(f) {
-  view.querySelectorAll('[data-a="ufilter"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
-  filterList();
-}
 function filterList() {
   const inp = view.querySelector('[data-a="filter"]');
   const q = inp ? inp.value.trim().toLowerCase() : '';
-  const fb = view.querySelector('[data-a="ufilter"][aria-pressed="true"]');
-  const f = fb ? fb.dataset.f : 'todas';
   let n = 0, any = false;
   view.querySelectorAll('[data-s]').forEach(el => {
     any = true;
-    const hide = (q && !el.dataset.s.includes(q)) || (f !== 'todas' && el.dataset.st && el.dataset.st !== f);
+    const hide = q && !el.dataset.s.includes(q);
     el.hidden = !!hide; if (!hide) n++;
   });
   const e = view.querySelector('[data-empty]'); if (e) e.hidden = !any || n > 0;
@@ -537,8 +478,8 @@ app.addEventListener('click', async (e) => {
     if (current === 'bitacora') refresh();
   }
   else if (a === 'report') {
-    const i = inc(b.dataset.inc), u = unit(i.unit);
-    const text = `Reporte ${i.id} · ${D.company.name}\nPrioridad: ${PR[i.pr][0]}\n${i.title}\nUnidad ${u.id} · placa ${u.plate} · operador ${u.driver}\nRuta: ${u.route}\nÚltima posición: ${u.pos}\nEstado: ${INC_STATUS[i.status][0]}\nAbierto: ${hhmm(i.opened)}`;
+    const i = inc(b.dataset.inc), u = i.v;
+    const text = `Reporte ${i.id} · ${D.company.name}\nPrioridad: ${PR[i.pr][0]}\n${i.title}\nUnidad ${u.unit} · placa ${u.plate} · operador ${u.driver}\nRuta: ${u.route}\nÚltima posición: ${u.pos}\nEstado: ${INC_STATUS[i.status][0]}\nAbierto: ${hhmm(i.opened)}`;
     openSheet(`<h3>¿Enviar reporte?</h3><p>Se abrirá la opción de compartir del teléfono para que elijas a quién enviarlo (WhatsApp, correo, etc.).</p>
       <textarea class="field" readonly rows="7" aria-label="Texto del reporte">${esc(text)}</textarea>
       <div class="opt" style="border:0"><div class="grow"><b>Cliente y base de origen</b><span class="tel">Tú eliges el destinatario</span></div><button class="call neutral" data-a="sendnow">Enviar</button></div>`,
@@ -588,7 +529,6 @@ app.addEventListener('click', async (e) => {
       <div class="opt" style="border:0"><div class="grow"></div><button class="call neutral" data-a="sendnow">Compartir</button></div>`,
       async () => { const r = await shareText('Resumen del turno', text); if (r === 'cancel') return; closeSheet(); r === 'manual' ? showManual(text) : toast(shareMsg[r]); });
   }
-  else if (a === 'ufilter') applyUnitFilter(b.dataset.f);
   else if (a === 'night') setTheme(isDark() ? 'light' : 'dark');
   else if (a === 'theme') setTheme(b.dataset.v);
   else if (a === 'big') { S.settings.big = !S.settings.big; save(); applySettings(); refresh(); }
