@@ -1,16 +1,16 @@
 # APP-MONITOREO-
 
-Centinela: app de monitoreo de unidades, alertas e incidentes para teléfonos Android, iPhone y tabletas.
+Centinela: app de monitoreo de alertas e incidentes para teléfonos Android, iPhone y tabletas.
 
 ## App (`app/`)
 
 App web instalable (PWA), sin paso de compilación: HTML, CSS y JavaScript.
 
 - `index.html`, `styles.css`, `app.js`: interfaz y lógica.
-- `data.js`: **datos de ejemplo** (unidades, incidentes, protocolos, contactos, pólizas, horarios, zonas). Aquí se conectará la plataforma de rastreo real.
+- `data.js`: **datos de ejemplo** (incidentes, protocolos, contactos, pólizas, horarios, zonas). La app no administra unidades: cada incidente solo trae los datos del vehículo involucrado como referencia.
 - `manifest.webmanifest`, `sw.js`, `icons/`: instalación y funcionamiento sin red.
 
-Secciones: Inicio, Unidades y viajes, Alertas e incidentes, Protocolos, Emergencias, Seguros, Horarios de circulación, Zonas de riesgo, Bitácora y relevo, Reportes, Configuración.
+Secciones: Inicio, Alertas e incidentes, Protocolos, Emergencias, Seguros, Horarios de circulación, Zonas de riesgo, Bitácora y relevo, Reportes, Configuración.
 
 Probar en local:
 
