@@ -70,26 +70,5 @@ window.DATA = {
     { id: 'Z-02', level: 'alto', name: 'Arco Norte, Km 30 – 60', state: 'Hidalgo', window: '22:00 – 05:00', risk: 'Robo con bloqueo de carretera', advice: 'Evitar paradas. Reportar cualquier reducción de velocidad.' },
     { id: 'Z-03', level: 'medio', name: 'Cumbres de Maltrata', state: 'Veracruz – Puebla', window: 'Todo el día', risk: 'Niebla, pendientes y poca cobertura celular', advice: 'Pérdida de señal frecuente. Esperar 10 min antes de escalar.' },
     { id: 'Z-04', level: 'medio', name: 'Paradores sin vigilancia, Lagos de Moreno', state: 'Jalisco', window: '21:00 – 06:00', risk: 'Robo de combustible y mercancía', advice: 'Usar solo paradores autorizados.' }
-  ],
-
-  log: [
-    [2, 'Llamada', 'Mariana R. llamó a cabina para confirmar el relevo de las 06:00.'],
-    [18, 'Evento', 'Cierre parcial en Carr. 57D, Km 95, reportado por Guardia Nacional.'],
-    [45, 'Novedad', 'Cliente Norte pide aviso por correo al llegar a Saltillo.'],
-    [80, 'Llamada', 'Ángeles Verdes atendió auxilio mecánico en Carr. 15D.'],
-    [230, 'Relevo', 'Inicio de turno. Recibido del turno anterior con 2 pendientes.']
-  ],
-
-  handover: [
-    'Revisar los pendientes con el siguiente turno',
-    'Comunicar novedades de carreteras y zonas de riesgo',
-    'Anotar pendientes de clientes',
-    'Cerrar o transferir llamadas en curso'
-  ],
-
-  pastReports: [
-    ['Turno A · vespertino', '14 entradas en bitácora · 3 llamadas'],
-    ['Turno C · matutino', '9 entradas en bitácora · 2 llamadas'],
-    ['Turno B · nocturno (ayer)', '17 entradas en bitácora · 5 llamadas']
   ]
 };

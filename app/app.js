@@ -57,14 +57,12 @@ function freshState() {
   const now = Date.now();
   return {
     t0: now, v3: true,
-    log: D.log.map(([m, cat, text]) => ({ t: now - m * 60000, cat, text })),
-    handover: D.handover.map(() => false),
     settings: { theme: 'light', big: false, rm: false, v2: true }
   };
 }
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
-if (!S || !S.log || !S.settings) S = freshState();
+if (!S || !S.settings) S = freshState();
 if (!S.v3) { const st = S.settings; S = freshState(); S.settings = st; S.v3 = true; }
 if (!S.settings.v2) { S.settings.theme = 'light'; S.settings.v2 = true; }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
@@ -80,7 +78,6 @@ function shift() {
   if (h >= 14 && h < 22) return { name: 'Vespertino A', next: '22:00' };
   return { name: 'Nocturno B', next: '06:00' };
 }
-function addLog(cat, text) { S.log.unshift({ t: Date.now(), cat, text }); save(); }
 
 /* ---------- Navegación ---------- */
 const NAV = [
@@ -92,7 +89,6 @@ const NAV = [
   ['seguros', 'Seguros', 'shield', 'c-ins', () => { const n = D.policies.filter(p => p.expiresDays).length; return n ? { n, cls: 'warn' } : null; }],
   ['horarios', 'Horarios de circulación', 'clock', 'c-time'],
   ['zonas', 'Zonas de riesgo', 'zone', 'c-zone'],
-  ['bitacora', 'Bitácora y relevo', 'log', 'c-log', () => ({ n: shift().next })],
   ['reportes', 'Reportes', 'rep', 'c-rep'],
   ['config', 'Configuración', 'cfg', 'c-cfg']
 ];
@@ -129,8 +125,6 @@ function renderDrawer() {
     <div class="ops" aria-label="Estado del turno">
       <div><small>Turno activo</small><b>${sh.name}</b></div>
       <div><small>Conexión</small><b data-net></b></div>
-      <div><small>Bitácora</small><b class="num">${S.log.length} entradas</b></div>
-      <div><small>Relevo</small><b class="num">${sh.next}</b></div>
     </div>
     <div class="d-foot">
       <div class="row"><span class="ic c-cfg">${svg('moon')}</span><span class="lbl">Modo nocturno</span><button class="switch" role="switch" aria-checked="${isDark()}" aria-label="Modo nocturno" data-a="night"></button></div>
@@ -143,7 +137,6 @@ function renderDrawer() {
 /* ---------- Componentes ---------- */
 const EVT = { 'P-01': 'sos', 'P-02': 'car', 'P-03': 'antenna', 'P-04': 'hand', 'P-05': 'clock', 'P-06': 'zone', 'P-07': 'speed' };
 const evIc = (protoId, pr, lg) => ic(EVT[protoId] || 'alert', 't-' + pr, lg);
-const LOGIC = { Llamada: ['phone', 'c-rep'], Novedad: ['info', 'c-unit'], Evento: ['alert', 't-high'], Incidente: ['alert', 't-high'], Relevo: ['users', 'c-proto'] };
 const lc = s => s.charAt(0).toLowerCase() + s.slice(1);
 
 function topbar(title, sub, back) {
@@ -176,14 +169,9 @@ function zoneRow(z) {
   return `<a class="li" href="#zonas" data-s="${esc((z.id + ' ' + z.name + ' ' + z.state + ' ' + z.risk).toLowerCase())}">${ic('zone', alto ? 't-crit' : 't-med', true)}
     <span class="body"><span class="ttl">${esc(z.name)}</span><span class="sub">${esc(z.state)} · ${esc(z.risk)}</span><span class="tags">${alto ? `<span class="pr pr-crit">Riesgo alto</span>` : `<span class="pr pr-med">Riesgo medio</span>`}<span class="sub num" style="margin:0">${esc(z.window)}</span></span></span>${svg('chev', 2, 'chev')}</a>`;
 }
-function logRow(e) {
-  const g = LOGIC[e.cat] || LOGIC.Novedad;
-  return `<div class="li" data-s="${esc((e.cat + ' ' + e.text).toLowerCase())}">${ic(g[0], g[1], true)}<span class="body"><span class="sub" style="margin:0 0 2px;font-weight:600;color:var(--ink-2)">${esc(e.cat)}</span><span style="display:block;font-size:15px">${esc(e.text)}</span></span><span class="end num" style="align-self:flex-start">${hhmm(e.t)}</span></div>`;
-}
 const searchBox = (ph, id) => `<label class="search">${svg('search')}<input type="search" id="${id}" data-a="filter" placeholder="${ph}" aria-label="${ph}" autocomplete="off"></label>`;
 const emptyBox = t => `<div class="empty" data-empty hidden style="margin-top:14px">${t}</div>`;
 const callBtn = (name, number, label) => `<button class="call ${label ? 'neutral' : ''}" data-a="dial" data-name="${esc(name)}" data-num="${esc(number)}">${label || 'Llamar'}</button>`;
-const sortedLog = () => S.log.slice().sort((a, b) => b.t - a.t);
 
 /* ---------- Pantallas ---------- */
 const PAGES = {};
@@ -198,22 +186,19 @@ PAGES.inicio = () => {
   ${searchBox('Buscar protocolo, contacto o zona', 'home-search')}
   <div class="pulse">
     <span class="chip"><span data-net></span></span>
-    <span class="chip num">Relevo ${sh.next}</span>
     <span class="chip demo">${svg('info', 2.4).replace('<svg', '<svg width="14" height="14"')}Datos de ejemplo</span>
   </div>
   <div class="kpis" data-hide-on-search>
     ${tile('protocolos', 'proto', 'c-proto', D.protocols.length, 'Protocolos', `${crit.length} de prioridad crítica`)}
     ${tile('zonas', 'zone', 't-crit', D.zones.filter(z => z.level === 'alto').length, 'Zonas de riesgo alto', `de ${D.zones.length} zonas registradas`)}
     ${tile('seguros', 'shield', exp.length ? 't-high' : 'c-ins', exp.length, 'Pólizas por vencer', exp.length ? `en ${exp[0].expiresDays} días` : 'todas vigentes')}
-    ${tile('bitacora', 'log', 'c-log', S.log.length, 'Entradas en bitácora', 'en este turno')}
+    ${tile('emergencias', 'phone', 'c-sos', D.contacts.length, 'Contactos de emergencia', 'llamada con confirmación')}
   </div>
   ${secH('Protocolos críticos')}
   <div class="group">${crit.map(protoRow).join('')}</div>
   ${secH('Contactos de emergencia')}
   <div class="group">${D.contacts.slice(0, 2).concat(D.contacts.filter(c => !c.public)).map(c => contactRow(c)).join('')}</div>
   <div data-only-search hidden>${secH('Otros resultados')}<div class="group">${D.protocols.filter(p => p.pr !== 'crit').map(protoRow).join('')}${D.contacts.filter(c => c.public).slice(2).map(c => contactRow(c)).join('')}${D.zones.map(zoneRow).join('')}</div></div>
-  <div data-hide-on-search>${secH('Últimas entradas de bitácora', `<a class="link" href="#bitacora" style="min-height:0">Ver todo</a>`)}
-  <div class="group">${sortedLog().slice(0, 3).map(logRow).join('')}</div></div>
   ${emptyBox('Sin resultados. Prueba con otro protocolo, contacto o zona.')}`;
 };
 
@@ -262,52 +247,8 @@ PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas registrad
   }).join('') +
   `${secH('Protocolo relacionado')}<div class="group">${protoRow(proto('P-06'))}</div>`;
 
-PAGES.bitacora = (tab) => {
-  tab = tab === 'relevo' ? 'relevo' : 'bitacora';
-  const sh = shift();
-  const t = (k, l) => `<button role="tab" aria-selected="${tab === k}" data-a="go" data-to="${k === 'bitacora' ? 'bitacora' : 'bitacora-relevo'}">${l}</button>`;
-  let body;
-  if (tab === 'bitacora') {
-    body = `<section class="card"><h3>${ic('log', 'c-log')}Nueva entrada</h3>
-      <form class="note" data-form="log" style="margin:0"><select id="log-cat" aria-label="Categoría"><option>Novedad</option><option>Llamada</option><option>Evento</option><option>Relevo</option></select>
-      <input id="log-text" placeholder="Qué pasó" aria-label="Texto de la entrada" autocomplete="off"><button type="submit">Agregar</button></form></section>
-      ${searchBox('Buscar en la bitácora', 'log-search')}
-      ${secH('Registro del turno', S.log.length)}
-      <div class="group">${sortedLog().map(logRow).join('')}</div>
-      ${emptyBox('Sin entradas con ese texto.')}`;
-  } else {
-    const done = S.handover.filter(Boolean).length;
-    body = `<section class="banner"><div class="head">${ic('users', 'c-proto', true)}<div class="tags"><span class="pr pr-info">${svg('clock', 2.6)}Relevo ${sh.next}</span><span class="pr pr-muted num">${done} de ${D.handover.length} listos</span></div></div>
-      <h2>Entrega del turno ${esc(sh.name)}</h2><div class="meta"><span>${S.log.length} entradas en bitácora</span></div></section>
-      <section class="card"><h3>${ic('check', 'c-rep')}Lista de entrega</h3><ul class="steps">${D.handover.map((h, k) => `<li><button role="checkbox" aria-checked="${!!S.handover[k]}" data-a="hstep" data-k="${k}"><span class="box">${svg('check', 3)}</span><span class="txt">${esc(h)}</span></button></li>`).join('')}</ul></section>
-      ${secH('Últimas entradas', `<a class="link" href="#bitacora" style="min-height:0">Ver todo</a>`)}<div class="group">${sortedLog().slice(0, 5).map(logRow).join('')}</div>
-      <div class="actions"><button class="act primary" data-a="handover">${ic('send', '')}<span class="grow">Entregar turno<small>Comparte el resumen y lo registra en bitácora</small></span></button></div>`;
-  }
-  return topbar('Bitácora y relevo', `Turno ${sh.name} · relevo ${sh.next}`) + `<div class="tabs" role="tablist">${t('bitacora', 'Bitácora')}${t('relevo', 'Relevo')}</div>` + body;
-};
-
-function shiftSummary() {
-  const sh = shift();
-  const byCat = {}; S.log.forEach(e => { byCat[e.cat] = (byCat[e.cat] || 0) + 1; });
-  const lines = [`Resumen del turno ${sh.name} · ${D.company.name}`, `Monitorista: ${D.user.name}`, `Fecha: ${new Date().toLocaleString('es-MX')}`, '',
-    `Entradas en bitácora: ${S.log.length}`, ...Object.entries(byCat).map(([k, n]) => `- ${k}: ${n}`), '', 'Últimas entradas:'];
-  sortedLog().slice(0, 8).forEach(e => lines.push(`- ${hhmm(e.t)} [${e.cat}] ${e.text}`));
-  return lines.join('\n');
-}
-
-PAGES.reportes = () => {
-  const byCat = Object.keys(LOGIC).filter(k => k !== 'Incidente').map(k => [k, S.log.filter(e => e.cat === k).length]);
-  return topbar('Reportes', `Turno ${shift().name}`) +
-  `<section class="card" style="margin-top:14px"><h3>${ic('rep', 'c-rep')}Resumen del turno</h3><div class="kv">
-    <div><small>Entradas en bitácora</small><b class="num">${S.log.length}</b></div><div><small>Llamadas</small><b class="num">${S.log.filter(e => e.cat === 'Llamada').length}</b></div>
-    <div><small>Lista de entrega</small><b class="num">${S.handover.filter(Boolean).length} de ${D.handover.length}</b></div><div><small>Relevo</small><b class="num">${shift().next}</b></div>
-  </div></section>
-  ${secH('Entradas por tipo')}
-  <div class="group">${byCat.map(([k, n]) => `<div class="li">${ic(LOGIC[k][0], LOGIC[k][1], true)}<span class="body"><span class="ttl">${k}</span></span><span class="end num" style="font-size:17px;font-weight:700;color:var(--ink)">${n}</span></div>`).join('')}</div>
-  <div class="actions"><button class="act primary" data-a="sharesummary">${ic('send', '')}<span class="grow">Compartir resumen del turno<small>Requiere confirmación</small></span></button></div>
-  ${secH('Reportes anteriores', 'Ejemplo')}
-  <div class="group">${D.pastReports.map(r => `<div class="li">${ic('rep', 'c-rep', true)}<span class="body"><span class="ttl">${esc(r[0])}</span><span class="sub">${esc(r[1])}</span></span></div>`).join('')}</div>`;
-};
+PAGES.reportes = () => `${topbar('Reportes', `Turno ${shift().name}`)}
+  <div class="empty" style="margin-top:14px">Esta sección está vacía por ahora.</div>`;
 
 PAGES.config = () => {
   const seg = (v, l) => `<button data-a="theme" data-v="${v}" aria-pressed="${S.settings.theme === v}">${l}</button>`;
@@ -320,10 +261,9 @@ PAGES.config = () => {
   <section class="card"><h3>${ic('download', 'c-unit')}Instalar en el teléfono</h3><div data-install-info></div></section>
   <section class="card"><h3>${ic('user', 'c-log')}Perfil</h3><div class="kv"><div><small>Nombre</small><b>${esc(D.user.name)}</b></div><div><small>Rol</small><b>${esc(D.user.role)}</b></div><div><small>Turno</small><b>${esc(D.user.shift)}</b></div><div><small>Empresa</small><b>${esc(D.company.name)}</b></div></div></section>
   <section class="card"><h3>${ic('info', 'c-cfg')}Modo demostración</h3>
-    <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios. Lo que registras se guarda solo en este teléfono.</p>
-    <button class="btn ghost" data-a="reset">Restablecer datos de ejemplo</button>
+    <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios.</p>
   </section>
-  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.3 demostración</p>`;
+  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.4 demostración</p>`;
 };
 
 /* ---------- Router ---------- */
@@ -414,46 +354,20 @@ app.addEventListener('click', async (e) => {
       <a class="link" href="#emergencias">Ver todos los contactos ${svg('chev')}</a>`);
   }
   else if (a === 'dial') {
-    openSheet(`<h3>¿Llamar a ${esc(b.dataset.name)}?</h3><p>Se abrirá el marcador del teléfono y la llamada quedará anotada en la bitácora.</p>
+    openSheet(`<h3>¿Llamar a ${esc(b.dataset.name)}?</h3><p>Se abrirá el marcador del teléfono.</p>
       <div class="opt">${ic('phone', 'c-rep', true)}<div class="grow"><b>${esc(b.dataset.name)}</b><span class="tel">${esc(b.dataset.num)}</span></div><button class="call" data-a="dialnow" data-name="${esc(b.dataset.name)}" data-num="${esc(b.dataset.num)}">Llamar</button></div>`);
   }
   else if (a === 'dialnow') {
     const num = b.dataset.num.replace(/[^\d+]/g, '');
-    addLog('Llamada', `${me()} abrió el marcador para llamar a ${b.dataset.name} (${b.dataset.num}).`);
     closeSheet();
     location.href = 'tel:' + num;
     toast(`Abriendo el marcador: ${b.dataset.num}. Si no se abre, márcalo a mano.`);
-    if (current === 'bitacora') refresh();
   }
   else if (a === 'sendnow') { if (sheetCb) await sheetCb(); }
-  else if (a === 'hstep') { const k = +b.dataset.k; S.handover[k] = !S.handover[k]; save(); refresh(); }
-  else if (a === 'handover') {
-    const text = shiftSummary();
-    openSheet(`<h3>¿Entregar turno?</h3><p>Comparte el resumen con quien recibe el turno. Se anotará en la bitácora.</p>
-      <textarea class="field" readonly rows="8" aria-label="Resumen del turno">${esc(text)}</textarea>
-      <div class="opt" style="border:0"><div class="grow">${S.handover.every(Boolean) ? '' : '<span class="pr pr-high">' + svg('excl', 2.6) + 'Lista incompleta</span>'}</div><button class="call neutral" data-a="sendnow">Entregar</button></div>`,
-      async () => {
-        const r = await shareText('Relevo de turno', text);
-        if (r === 'cancel') return;
-        addLog('Relevo', `${me()} entregó el turno ${shift().name}.`); closeSheet(); refresh();
-        r === 'manual' ? showManual(text) : toast(shareMsg[r]);
-      });
-  }
-  else if (a === 'sharesummary') {
-    const text = shiftSummary();
-    openSheet(`<h3>¿Compartir resumen?</h3><p>Elige a quién enviarlo en el siguiente paso.</p><textarea class="field" readonly rows="8" aria-label="Resumen del turno">${esc(text)}</textarea>
-      <div class="opt" style="border:0"><div class="grow"></div><button class="call neutral" data-a="sendnow">Compartir</button></div>`,
-      async () => { const r = await shareText('Resumen del turno', text); if (r === 'cancel') return; closeSheet(); r === 'manual' ? showManual(text) : toast(shareMsg[r]); });
-  }
   else if (a === 'night') setTheme(isDark() ? 'light' : 'dark');
   else if (a === 'theme') setTheme(b.dataset.v);
   else if (a === 'big') { S.settings.big = !S.settings.big; save(); applySettings(); refresh(); }
   else if (a === 'rm') { S.settings.rm = !S.settings.rm; save(); applySettings(); refresh(); }
-  else if (a === 'reset') {
-    openSheet(`<h3>¿Restablecer datos de ejemplo?</h3><p>Se borran las entradas de bitácora y la lista de entrega que hiciste en este teléfono.</p>
-      <div class="opt" style="border:0"><div class="grow"></div><button class="call" data-a="sendnow">Restablecer</button></div>`,
-      async () => { const st = S.settings; S = freshState(); S.settings = st; save(); closeSheet(); location.hash = 'inicio'; render(); toast('Datos de ejemplo restablecidos.'); });
-  }
   else if (a === 'install') {
     if (deferredPrompt) { deferredPrompt.prompt(); const r = await deferredPrompt.userChoice; deferredPrompt = null; if (r.outcome === 'accepted') toast('Instalando Centinela…'); paintInstall(); }
   }
@@ -473,10 +387,6 @@ app.addEventListener('input', (e) => {
 app.addEventListener('submit', (e) => {
   e.preventDefault();
   const f = e.target, kind = f.dataset.form;
-  if (kind === 'log') {
-    const v = f.querySelector('#log-text').value.trim(); if (!v) return;
-    addLog(f.querySelector('#log-cat').value, `${me()}: ${v}`); refresh(); toast('Entrada agregada a la bitácora.');
-  }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSheet(); setMenu(false); } });
 
