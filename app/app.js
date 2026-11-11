@@ -246,10 +246,10 @@ PAGES.seguros = () => topbar('Seguros', `${D.policies.length} pólizas`) +
     <div class="opt" style="margin-top:12px"><div class="grow"><b>Reportar siniestro</b><span class="tel">${esc(p.phone)}</span></div>${callBtn(p.insurer + ' · siniestros', p.phone)}</div>
   </section>`).join('');
 
-PAGES.horarios = () => topbar('Horarios de circulación', `${D.schedules.length} reglas`) +
-  secH('Reglas', 'Ejemplos: reemplazar por la normativa vigente') +
+PAGES.horarios = () => topbar('Horarios de circulación', `${D.schedules.length} restricciones de horario`) +
+  secH('Restricciones de horario', 'Ejemplos: reemplazar por la normativa vigente') +
   `<div class="group">${D.schedules.map(s => `<div class="li">${ic('clock', 'c-time', true)}<span class="body"><span class="ttl">${esc(s.name)}</span><span class="sub num">${esc(s.window)} · ${esc(s.where)}</span><span class="sub" style="color:var(--ink-2)">${esc(s.rule)}</span></span></div>`).join('')}</div>
-  ${secH('Protocolo relacionado')}<div class="group">${protoRow(proto('P-05'))}</div>`;
+`;
 
 PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas registradas`) +
   D.zones.map(z => {
