@@ -36,6 +36,7 @@ const I = {
   expand:'<path d="m9 6 6 6-6 6M4 4v16"/>',
   download:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8v.2"/>',
+  calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="m8.5 15 2.2 2.2 4.8-4.7"/>',
   car:'<path d="M5 15.5v-4l2-4.6A1.5 1.5 0 0 1 8.4 6h7.2a1.5 1.5 0 0 1 1.4.9l2 4.6v4"/><rect x="3.5" y="11.5" width="17" height="5" rx="1.5"/><path d="M6.5 16.5V19M17.5 16.5V19M7 14h1.5M15.5 14H17"/>',
   antenna:'<path d="M12 11v10M9 21h6"/><circle cx="12" cy="9" r="1.6"/><path d="M8.6 5.6a4.8 4.8 0 0 0 0 6.8M15.4 5.6a4.8 4.8 0 0 1 0 6.8M5.8 3a8.6 8.6 0 0 0 0 12M18.2 3a8.6 8.6 0 0 1 0 12M3 3l18 18"/>',
   hand:'<path d="M8 12.5V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14c0 3.9-2.7 7-6.3 7-2.3 0-3.8-1-5-2.7L3.9 15.7a1.6 1.6 0 0 1 2.5-2L8 15.2"/>',
@@ -83,6 +84,7 @@ function shift() {
 const NAV = [
   ['Operación'],
   ['inicio', 'Inicio', 'home', 'c-home'],
+  ['operacion', 'Operación del día', 'calendar', 'c-op', null, null, 'https://jhonygarpz-alt.github.io/OPTIMA-DUAL-SOLUTIONS/'],
   ['protocolos', 'Protocolos', 'proto', 'c-proto'],
   ['emergencias', 'Emergencias', 'sos', 'c-sos'],
   ['directorio', 'Directorio de operadores', 'users', 'c-unit'],
@@ -110,14 +112,14 @@ function renderDrawer() {
     <div class="d-body">`;
   for (const n of NAV) {
     if (n.length === 1) { h += `<div class="grp">${n[0]}</div>`; continue; }
-    const [id, lbl, icon, col, cntF, hasSub] = n;
+    const [id, lbl, icon, col, cntF, hasSub, ext] = n;
     const cnt = cntF && cntF();
     const cntH = cnt ? `<span class="cnt num ${cnt.cls || ''}">${cnt.n}</span>` : '';
     const mini = cnt && cnt.cls ? `<span class="mini ${cnt.cls}">${cnt.n}</span>` : '';
     const cur = (PARENT[current] || current) === id;
     h += `<div data-nav="${lbl.toLowerCase()}">`;
     {
-      h += `<a class="item" href="#${id}" data-go ${cur ? 'aria-current="page"' : ''} style="text-decoration:none;color:inherit"><span class="ic ${col}">${svg(icon)}${mini}</span><span class="lbl">${lbl}</span>${cntH}</a>`;
+      h += `<a class="item" href="${ext || '#' + id}" ${ext ? 'target="_blank" rel="noopener"' : 'data-go'} ${cur ? 'aria-current="page"' : ''} style="text-decoration:none;color:inherit"><span class="ic ${col}">${svg(icon)}${mini}</span><span class="lbl">${lbl}</span>${cntH}</a>`;
     }
     h += `</div>`;
   }
@@ -179,9 +181,9 @@ const PAGES = {};
 
 PAGES.inicio = () => topbar('Inicio', `${esc(D.company.name)} · Turno ${shift().name}`) +
   `<div data-install-slot></div>
-  <nav class="apps" aria-label="Funciones de la app">${NAV.filter(n => n.length > 1 && n[0] !== 'inicio').map(([id, lbl, icon, col, cntF]) => {
+  <nav class="apps" aria-label="Funciones de la app">${NAV.filter(n => n.length > 1 && n[0] !== 'inicio').map(([id, lbl, icon, col, cntF, , ext]) => {
     const cnt = cntF && cntF();
-    return `<a class="app-i" href="#${id}"><span class="ic ${col}">${svg(icon)}${cnt ? `<span class="badge num">${cnt.n}</span>` : ''}</span><span class="lbl">${lbl}</span></a>`;
+    return `<a class="app-i" href="${ext || '#' + id}"${ext ? ' target="_blank" rel="noopener"' : ''}><span class="ic ${col}">${svg(icon)}${cnt ? `<span class="badge num">${cnt.n}</span>` : ''}</span><span class="lbl">${lbl}</span></a>`;
   }).join('')}</nav>`;
 
 PAGES.protocolos = () => topbar('Protocolos', `${D.protocols.length} protocolos vigentes`) +
