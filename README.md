@@ -7,10 +7,11 @@ Centinela: app de consulta para el turno de monitoreo (protocolos, emergencias, 
 App web instalable (PWA), sin paso de compilación: HTML, CSS y JavaScript.
 
 - `index.html`, `styles.css`, `app.js`: interfaz y lógica.
+- `directorio.js`: directorio de operadores (datos reales, publicados con autorización).
 - `data.js`: **datos de ejemplo** (protocolos, contactos, pólizas, horarios, zonas). La app no administra unidades, incidentes ni bitácora.
 - `manifest.webmanifest`, `sw.js`, `icons/`: instalación y funcionamiento sin red.
 
-Secciones: Inicio, Protocolos, Emergencias, Seguros, Horarios de circulación, Zonas de riesgo, Reportes (vacía por ahora), Configuración.
+Secciones: Inicio, Protocolos, Emergencias, Directorio de operadores, Seguros, Horarios de circulación, Zonas de riesgo, Reportes (vacía por ahora), Configuración.
 
 Probar en local:
 

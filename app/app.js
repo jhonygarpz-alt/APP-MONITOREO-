@@ -85,6 +85,7 @@ const NAV = [
   ['inicio', 'Inicio', 'home', 'c-home'],
   ['protocolos', 'Protocolos', 'proto', 'c-proto'],
   ['emergencias', 'Emergencias', 'sos', 'c-sos'],
+  ['directorio', 'Directorio de operadores', 'users', 'c-unit'],
   ['Control'],
   ['seguros', 'Seguros', 'shield', 'c-ins', () => { const n = D.policies.filter(p => p.expiresDays).length; return n ? { n, cls: 'warn' } : null; }],
   ['horarios', 'Horarios de circulación', 'clock', 'c-time'],
@@ -203,6 +204,20 @@ PAGES.emergencias = () => topbar('Emergencias', 'Toca Llamar y confirma. Los nú
   <div class="grp-h"><span class="pdot crit"></span>Protocolos de emergencia</div>
   <div class="group">${D.protocols.filter(p => p.pr === 'crit').map(protoRow).join('')}</div>`;
 
+PAGES.directorio = () => {
+  const list = (window.DIRECTORY || []).slice().sort((a, b) => (a.role === 'Operador') - (b.role === 'Operador') || (a.name + ' ' + a.last).localeCompare(b.name + ' ' + b.last, 'es'));
+  const sites = [...new Set(list.map(p => p.site))];
+  const initials = p => (p.name[0] + (p.last[0] || '')).toUpperCase();
+  return topbar('Directorio de operadores', `${list.length} personas · ${list.filter(p => p.phone).length} con teléfono`) +
+  searchBox('Nombre, teléfono o site', 'dir-search') +
+  `<div class="tabs" role="group" aria-label="Filtrar por site"><button data-a="prf" data-v="all" aria-pressed="true">Todos</button>${sites.map(s => `<button data-a="prf" data-v="${s}" aria-pressed="false">${s === 'LRD' ? 'Nuevo Laredo' : s === 'MTY' ? 'Monterrey' : s}</button>`).join('')}</div>
+  <div class="group" style="margin-top:14px">${list.map(p => `<div class="li" data-pr="${p.site}" data-s="${esc((p.name + ' ' + p.last + ' ' + p.phone + ' ' + p.phone.replace(/\D/g, '') + ' ' + p.role + ' ' + p.site).toLowerCase())}">
+    <span class="avatar dir-av" aria-hidden="true">${esc(initials(p))}</span>
+    <span class="body"><span class="ttl">${esc(p.name)} ${esc(p.last)}</span><span class="sub">${esc(p.role)} · ${esc(p.site)}</span>${p.phone ? `<span class="sub tel">${esc(p.phone)}</span>` : '<span class="sub">Sin teléfono registrado</span>'}</span>
+    ${p.phone ? `<button class="call neutral" data-a="dial" data-name="${esc(p.name + ' ' + p.last)}" data-num="${esc(p.phone)}">Llamar</button>` : ''}</div>`).join('')}</div>
+  ${emptyBox('No hay operadores con ese nombre, teléfono o site.')}`;
+};
+
 PAGES.seguros = () => topbar('Seguros', `${D.policies.length} pólizas`) +
   D.policies.map(p => `<section class="card" style="margin-top:14px">
     <h3>${ic('shield', 'c-ins')}<span style="flex:1;min-width:0">${esc(p.type)}</span>${p.expiresDays ? `<span class="pr pr-high">${svg('excl', 2.6)}Vence en ${p.expiresDays} días</span>` : `<span class="pr pr-ok">${svg('check', 2.6)}Vigente</span>`}</h3>
@@ -244,7 +259,7 @@ PAGES.config = () => {
   <section class="card"><h3>${ic('info', 'c-cfg')}Modo demostración</h3>
     <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios.</p>
   </section>
-  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.5 demostración</p>`;
+  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.6 demostración</p>`;
 };
 
 /* ---------- Router ---------- */

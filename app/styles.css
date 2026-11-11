@@ -184,6 +184,9 @@ a{color:inherit;-webkit-tap-highlight-color:transparent}
 .app-i:active .ic{transform:scale(.94)}
 .app-i .ic{transition:transform .12s var(--ease)}
 
+.dir-av{background:var(--accent-bg);color:var(--accent);width:44px;height:44px;font-size:14px}
+.dir-av::after{display:none}
+
 /* ---------- Menú lateral ---------- */
 .scrim{position:absolute;inset:0;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .24s var(--ease);z-index:20}
 .drawer{position:absolute;top:calc(var(--st) + 8px);bottom:calc(var(--sb) + 8px);left:max(8px,var(--sl));width:min(86%,320px);border-radius:24px;z-index:21;display:flex;flex-direction:column;
