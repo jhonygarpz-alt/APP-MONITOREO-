@@ -85,13 +85,13 @@ window.DATA = {
     { name: '089 · Denuncia anónima', number: '089', note: 'Reportes sin identificarse', icon: 'phone', public: true },
     { name: '078 · Ángeles Verdes', number: '078', note: 'Auxilio mecánico en carretera', icon: 'truck', public: true },
     { name: 'Cabina de monitoreo', number: '720 476 5054', note: 'Cabina interna', icon: 'phone' },
-    { name: 'Aseguradora · siniestros', number: '800 000 0000', note: 'Número de ejemplo', icon: 'shield' },
+    { name: 'Quálitas · siniestros', number: '800 800 2880', note: 'Reporte de siniestros, todo el país', icon: 'shield' },
     { name: 'Gerente de operaciones', number: '+52 442 000 0001', note: 'Número de ejemplo', icon: 'user' }
   ],
 
   policies: [
-    { id: 'POL-FL-2026-0081', insurer: 'Aseguradora Ejemplo', type: 'Flotilla · cobertura amplia', from: '01 ene 2026', to: '31 dic 2026', deductible: '5 % daños materiales · 10 % robo total', phone: '800 000 0000' },
-    { id: 'POL-MC-2025-0412', insurer: 'Aseguradora Ejemplo', type: 'Mercancía en tránsito', from: '21 nov 2025', to: '21 nov 2026', deductible: '3 % del valor declarado', phone: '800 000 0000', expiresDays: 12 }
+    { id: 'POL-FL-2026-0081', insurer: 'Quálitas', type: 'Flotilla · cobertura amplia', from: '01 ene 2026', to: '31 dic 2026', deductible: '5 % daños materiales · 10 % robo total', phone: '800 800 2880' },
+    { id: 'POL-MC-2025-0412', insurer: 'Quálitas', type: 'Mercancía en tránsito', from: '21 nov 2025', to: '21 nov 2026', deductible: '3 % del valor declarado', phone: '800 800 2880', expiresDays: 12 }
   ],
 
   schedules: [

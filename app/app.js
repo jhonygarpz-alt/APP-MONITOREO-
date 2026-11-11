@@ -293,7 +293,7 @@ PAGES.seguros = () => topbar('Seguros', `${D.policies.length} pólizas`) +
     <div class="kv"><div><small>Póliza</small><b class="num">${p.id}</b></div><div><small>Aseguradora</small><b>${esc(p.insurer)}</b></div>
     <div><small>Desde</small><b>${p.from}</b></div><div><small>Hasta</small><b>${p.to}</b></div>
     <div class="full"><small>Deducible</small><b>${esc(p.deductible)}</b></div></div>
-    <div class="opt" style="margin-top:10px"><div class="grow"><b>Reportar siniestro</b><span class="tel">${esc(p.phone)}</span></div>${callBtn('Aseguradora · siniestros', p.phone)}</div>
+    <div class="opt" style="margin-top:10px"><div class="grow"><b>Reportar siniestro</b><span class="tel">${esc(p.phone)}</span></div>${callBtn(p.insurer + ' · siniestros', p.phone)}</div>
   </section>`).join('');
 
 PAGES.horarios = () => {
