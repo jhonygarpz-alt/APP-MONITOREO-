@@ -173,6 +173,17 @@ a{color:inherit;-webkit-tap-highlight-color:transparent}
 .chev{width:18px;height:18px;color:#c4c4c7;flex:none}
 .empty{padding:20px;text-align:center;color:var(--ink-3);border-radius:14px;background:var(--surface);box-shadow:var(--shadow)}
 
+/* Cuadrícula de funciones en Inicio */
+.apps{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 10px;margin-top:22px}
+@media (min-width:560px){.apps{grid-template-columns:repeat(4,1fr)}}
+.app-i{display:flex;flex-direction:column;align-items:center;gap:9px;text-decoration:none;color:var(--ink);text-align:center;padding:4px 2px;border-radius:18px;min-width:0}
+.app-i .ic{width:76px;height:76px;border-radius:22px;box-shadow:0 2px 6px -2px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.6)}
+.app-i .ic svg{width:36px;height:36px;stroke-width:1.9}
+.app-i .lbl{font-size:15px;font-weight:500;line-height:1.2;text-wrap:balance;overflow-wrap:anywhere}
+.app-i .badge{top:-7px;right:-7px;min-width:26px;height:26px;font-size:13.5px;border-radius:13px;background:var(--high);border:3px solid var(--bg)}
+.app-i:active .ic{transform:scale(.94)}
+.app-i .ic{transition:transform .12s var(--ease)}
+
 /* ---------- Menú lateral ---------- */
 .scrim{position:absolute;inset:0;background:var(--scrim);opacity:0;pointer-events:none;transition:opacity .24s var(--ease);z-index:20}
 .drawer{position:absolute;top:calc(var(--st) + 8px);bottom:calc(var(--sb) + 8px);left:max(8px,var(--sl));width:min(86%,320px);border-radius:24px;z-index:21;display:flex;flex-direction:column;

@@ -176,31 +176,12 @@ const callBtn = (name, number, label) => `<button class="call ${label ? 'neutral
 /* ---------- Pantallas ---------- */
 const PAGES = {};
 
-PAGES.inicio = () => {
-  const sh = shift();
-  const crit = D.protocols.filter(p => p.pr === 'crit');
-  const tile = (href, icon, col, v, l, s) => `<a class="kpi" href="#${href}"><div class="top">${ic(icon, col, true)}</div><div class="v num">${v}</div><div><div class="l">${l}</div><div class="s">${s}</div></div></a>`;
-  const exp = D.policies.filter(p => p.expiresDays);
-  return topbar('Inicio', `${esc(D.company.name)} · Turno ${sh.name}`) +
+PAGES.inicio = () => topbar('Inicio', `${esc(D.company.name)} · Turno ${shift().name}`) +
   `<div data-install-slot></div>
-  ${searchBox('Buscar protocolo, contacto o zona', 'home-search')}
-  <div class="pulse">
-    <span class="chip"><span data-net></span></span>
-    <span class="chip demo">${svg('info', 2.4).replace('<svg', '<svg width="14" height="14"')}Datos de ejemplo</span>
-  </div>
-  <div class="kpis" data-hide-on-search>
-    ${tile('protocolos', 'proto', 'c-proto', D.protocols.length, 'Protocolos', `${crit.length} de prioridad crítica`)}
-    ${tile('zonas', 'zone', 't-crit', D.zones.filter(z => z.level === 'alto').length, 'Zonas de riesgo alto', `de ${D.zones.length} zonas registradas`)}
-    ${tile('seguros', 'shield', exp.length ? 't-high' : 'c-ins', exp.length, 'Pólizas por vencer', exp.length ? `en ${exp[0].expiresDays} días` : 'todas vigentes')}
-    ${tile('emergencias', 'phone', 'c-sos', D.contacts.length, 'Contactos de emergencia', 'llamada con confirmación')}
-  </div>
-  ${secH('Protocolos críticos')}
-  <div class="group">${crit.map(protoRow).join('')}</div>
-  ${secH('Contactos de emergencia')}
-  <div class="group">${D.contacts.slice(0, 2).concat(D.contacts.filter(c => !c.public)).map(c => contactRow(c)).join('')}</div>
-  <div data-only-search hidden>${secH('Otros resultados')}<div class="group">${D.protocols.filter(p => p.pr !== 'crit').map(protoRow).join('')}${D.contacts.filter(c => c.public).slice(2).map(c => contactRow(c)).join('')}${D.zones.map(zoneRow).join('')}</div></div>
-  ${emptyBox('Sin resultados. Prueba con otro protocolo, contacto o zona.')}`;
-};
+  <nav class="apps" aria-label="Funciones de la app">${NAV.filter(n => n.length > 1 && n[0] !== 'inicio').map(([id, lbl, icon, col, cntF]) => {
+    const cnt = cntF && cntF();
+    return `<a class="app-i" href="#${id}"><span class="ic ${col}">${svg(icon)}${cnt ? `<span class="badge num">${cnt.n}</span>` : ''}</span><span class="lbl">${lbl}</span></a>`;
+  }).join('')}</nav>`;
 
 PAGES.protocolos = () => topbar('Protocolos', `${D.protocols.length} protocolos vigentes`) +
   searchBox('Buscar protocolo', 'proto-search') + prSeg() +
@@ -263,7 +244,7 @@ PAGES.config = () => {
   <section class="card"><h3>${ic('info', 'c-cfg')}Modo demostración</h3>
     <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios.</p>
   </section>
-  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.4 demostración</p>`;
+  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.5 demostración</p>`;
 };
 
 /* ---------- Router ---------- */
