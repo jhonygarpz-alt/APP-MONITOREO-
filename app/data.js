@@ -84,7 +84,7 @@ window.DATA = {
     { name: '088 · Guardia Nacional', number: '088', note: 'Seguridad en carreteras federales', icon: 'shield', public: true },
     { name: '089 · Denuncia anónima', number: '089', note: 'Reportes sin identificarse', icon: 'phone', public: true },
     { name: '078 · Ángeles Verdes', number: '078', note: 'Auxilio mecánico en carretera', icon: 'truck', public: true },
-    { name: 'Cabina de monitoreo', number: '+52 442 000 0000', note: 'Número de ejemplo', icon: 'phone' },
+    { name: 'Cabina de monitoreo', number: '720 476 5054', note: 'Cabina interna', icon: 'phone' },
     { name: 'Aseguradora · siniestros', number: '800 000 0000', note: 'Número de ejemplo', icon: 'shield' },
     { name: 'Gerente de operaciones', number: '+52 442 000 0001', note: 'Número de ejemplo', icon: 'user' }
   ],
