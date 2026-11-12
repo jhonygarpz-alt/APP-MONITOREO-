@@ -73,7 +73,8 @@ if (!S.settings.v2) { S.settings.theme = 'light'; S.settings.v2 = true; }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 /* ---------- Turnos del personal (rotación 12 h: 2 días, 2 noches, 2 descansos) ---------- */
 if (!S.sched) S.sched = {};
-if (!S.staff || !Array.isArray(S.staff.offsets) || S.staff.offsets.length !== D.staff.length) S.staff = { offsets: D.staff.map(p => p.offset), dayStart: D.rotation.dayStart };
+if (!S.staff || !Array.isArray(S.staff.offsets) || S.staff.offsets.length !== D.staff.length) S.staff = { offsets: D.staff.map(p => p.offset), dayStart: D.rotation.dayStart, v2: true };
+if (!S.staff.v2) { S.staff.dayStart = D.rotation.dayStart; S.staff.v2 = true; }
 if (!S.acts) S.acts = {};
 const pad = n => String(n).padStart(2, '0');
 const dkey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

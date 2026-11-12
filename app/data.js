@@ -80,7 +80,7 @@ window.DATA = {
     { name: 'Gabriel Eduardo Avalos Rios', short: 'Gabriel', offset: 4 },
     { name: 'David Cruz', short: 'David', offset: 2 }
   ],
-  rotation: { anchor: '2026-11-09', pattern: ['D', 'D', 'N', 'N', 'R', 'R'], dayStart: '07:00' },
+  rotation: { anchor: '2026-11-09', pattern: ['D', 'D', 'N', 'N', 'R', 'R'], dayStart: '06:00' },
 
   /* Actividades del área de monitoreo. suggested: true = agregada como sugerencia. */
   activities: [
