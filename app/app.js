@@ -36,6 +36,10 @@ const I = {
   expand:'<path d="m9 6 6 6-6 6M4 4v16"/>',
   download:'<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
   info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8v.2"/>',
+  checklist:'<path d="M10 6h10M10 12h10M10 18h10"/><path d="m3.5 6 1.6 1.6L8 4.7M3.5 12l1.6 1.6L8 10.7M3.5 18l1.6 1.6L8 16.7"/>',
+  badge:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 9.8-5.6"/><circle cx="17.5" cy="16.5" r="4.5"/><path d="M17.5 14.3v2.4l1.6 1"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  bed:'<path d="M3 18V7M3 14h18v4M21 14v-2.5a3 3 0 0 0-3-3h-7v5.5"/><circle cx="7" cy="11" r="2"/>',
   calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="m8.5 15 2.2 2.2 4.8-4.7"/>',
   car:'<path d="M5 15.5v-4l2-4.6A1.5 1.5 0 0 1 8.4 6h7.2a1.5 1.5 0 0 1 1.4.9l2 4.6v4"/><rect x="3.5" y="11.5" width="17" height="5" rx="1.5"/><path d="M6.5 16.5V19M17.5 16.5V19M7 14h1.5M15.5 14H17"/>',
   antenna:'<path d="M12 11v10M9 21h6"/><circle cx="12" cy="9" r="1.6"/><path d="M8.6 5.6a4.8 4.8 0 0 0 0 6.8M15.4 5.6a4.8 4.8 0 0 1 0 6.8M5.8 3a8.6 8.6 0 0 0 0 12M18.2 3a8.6 8.6 0 0 1 0 12M3 3l18 18"/>',
@@ -67,24 +71,51 @@ if (!S || !S.settings) S = freshState();
 if (!S.v3) { const st = S.settings; S = freshState(); S.settings = st; S.v3 = true; }
 if (!S.settings.v2) { S.settings.theme = 'light'; S.settings.v2 = true; }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+/* ---------- Turnos del personal (rotación 12 h: 2 días, 2 noches, 2 descansos) ---------- */
+if (!S.sched) S.sched = {};
+if (!S.staff || !Array.isArray(S.staff.offsets) || S.staff.offsets.length !== D.staff.length) S.staff = { offsets: D.staff.map(p => p.offset), dayStart: D.rotation.dayStart, v2: true };
+if (!S.staff.v2) { S.staff.dayStart = D.rotation.dayStart; S.staff.v2 = true; }
+if (!S.acts) S.acts = {};
+const pad = n => String(n).padStart(2, '0');
+const dkey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const kdate = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayNum = k => { const [y, m, d] = k.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
+const addDays = (k, n) => { const d = kdate(k); d.setDate(d.getDate() + n); return dkey(d); };
+const monday = k => addDays(k, -((kdate(k).getDay() + 6) % 7));
+const mod = (a, n) => ((a % n) + n) % n;
+const isDay = k => /^\d{4}-\d{2}-\d{2}$/.test(k || '');
+const SHIFT = { D: ['Día', 'sh-d'], N: ['Noche', 'sh-n'], R: ['Descanso', 'sh-r'] };
+const POS = ['Día 1', 'Día 2', 'Noche 1', 'Noche 2', 'Descanso 1', 'Descanso 2'];
+const cyclePos = (i, k) => mod(dayNum(k) - dayNum(D.rotation.anchor) + S.staff.offsets[i], D.rotation.pattern.length);
+const isOverride = (i, k) => !!(S.sched[k] && S.sched[k][i]);
+const rot = (i, k) => (S.sched[k] && S.sched[k][i]) || D.rotation.pattern[cyclePos(i, k)];
+const hmParts = str => str.split(':').map(Number);
+function onDuty() {
+  const now = new Date(); const [h, m] = hmParts(S.staff.dayStart);
+  const start = new Date(now); start.setHours(h, m, 0, 0);
+  const end = new Date(start.getTime() + 12 * 36e5);
+  let type, date, from, to;
+  if (now >= start && now < end) { type = 'D'; date = dkey(now); from = start; to = end; }
+  else if (now >= end) { type = 'N'; date = dkey(now); from = end; to = new Date(end.getTime() + 12 * 36e5); }
+  else { type = 'N'; const y = new Date(now); y.setDate(y.getDate() - 1); date = dkey(y); from = new Date(start.getTime() - 12 * 36e5); to = start; }
+  const on = D.staff.map((p, i) => Object.assign({ i }, p)).filter(p => rot(p.i, date) === type);
+  return { type, date, from, to, on };
+}
+function shift() { const c = onDuty(); return { name: c.type === 'D' ? 'de día' : 'de noche', label: c.type === 'D' ? 'Día' : 'Noche', next: hhmm(c.to), c }; }
 
 const proto = id => D.protocols.find(p => p.id === id);
 const hhmm = t => new Date(t).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
 const ago = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : `hace ${Math.floor(m / 60)} h ${m % 60} min`; };
 const clock = t => { const s = Math.max(0, Math.floor((Date.now() - t) / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60; return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0'); };
 const me = () => D.user.name.split(' ')[0] + ' ' + D.user.name.split(' ')[1][0] + '.';
-function shift() {
-  const h = new Date().getHours();
-  if (h >= 6 && h < 14) return { name: 'Matutino C', next: '14:00' };
-  if (h >= 14 && h < 22) return { name: 'Vespertino A', next: '22:00' };
-  return { name: 'Nocturno B', next: '06:00' };
-}
 
 /* ---------- Navegación ---------- */
 const NAV = [
   ['Operación'],
   ['inicio', 'Inicio', 'home', 'c-home'],
   ['operacion', 'Operación del día', 'calendar', 'c-op', null, null, 'https://jhonygarpz-alt.github.io/OPTIMA-DUAL-SOLUTIONS/'],
+  ['actividades', 'Actividades de monitoreo', 'checklist', 'c-act'],
+  ['personal', 'Personal activo y horarios', 'badge', 'c-log'],
   ['protocolos', 'Protocolos', 'proto', 'c-proto'],
   ['emergencias', 'Emergencias', 'sos', 'c-sos'],
   ['directorio', 'Directorio de operadores', 'users', 'c-unit'],
@@ -95,7 +126,7 @@ const NAV = [
   ['reportes', 'Reportes', 'rep', 'c-rep'],
   ['config', 'Configuración', 'cfg', 'c-cfg']
 ];
-const PARENT = { protocolo: 'protocolos' };
+const PARENT = { protocolo: 'protocolos', turnos: 'personal' };
 
 const app = document.getElementById('app');
 const view = document.getElementById('view');
@@ -126,7 +157,7 @@ function renderDrawer() {
   const sh = shift();
   h += `</div>
     <div class="ops" aria-label="Estado del turno">
-      <div><small>Turno activo</small><b>${sh.name}</b></div>
+      <div><small>Turno activo</small><b>${sh.label} · hasta ${sh.next}</b></div>
       <div><small>Conexión</small><b data-net></b></div>
     </div>
     <div class="d-foot">
@@ -248,6 +279,90 @@ PAGES.zonas = () => topbar('Zonas de riesgo', `${D.zones.length} zonas registrad
 PAGES.reportes = () => `${topbar('Reportes', `Turno ${shift().name}`)}
   <div class="empty" style="margin-top:14px">Esta sección está vacía por ahora.</div>`;
 
+function weekGrid(wk, edit) {
+  const today = dkey(new Date());
+  const days = [...Array(7)].map((_, n) => addDays(wk, n));
+  const head = `<div class="wk-h"></div>${D.staff.map(p => `<div class="wk-h">${esc(p.short)}</div>`).join('')}`;
+  const rows = days.map(k => {
+    const lbl = kdate(k).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric' });
+    return `<div class="wk-d${k === today ? ' today' : ''}">${lbl}${k === today ? '<small>Hoy</small>' : ''}</div>${D.staff.map((p, i) => {
+      const [t, cls] = SHIFT[rot(i, k)];
+      return edit
+        ? `<button class="wk-c ${cls}${isOverride(i, k) ? ' ov' : ''}${k === today ? ' today' : ''}" data-a="cyc" data-k="${k}" data-i="${i}" aria-label="${esc(p.short)}, ${lbl}: ${t}${isOverride(i, k) ? ' (cambiado)' : ''}. Toca para cambiar">${t}</button>`
+        : `<div class="wk-c ${cls}${k === today ? ' today' : ''}">${t}</div>`;
+    }).join('')}`;
+  }).join('');
+  return `<div class="wk" style="grid-template-columns:76px repeat(${D.staff.length},minmax(0,1fr))">${head}${rows}</div>`;
+}
+function weekNav(page, wk) {
+  const f = k => kdate(k).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  return `<div class="wk-nav"><a class="btn-ic" href="#${page}-${addDays(wk, -7)}" aria-label="Semana anterior">${svg('back')}</a><b>${f(wk)} – ${f(addDays(wk, 6))}</b><a class="btn-ic" href="#${page}-${addDays(wk, 7)}" aria-label="Semana siguiente">${svg('chev')}</a></div>`;
+}
+const names = list => list.length ? list.map(p => esc(p.short)).join(' y ') : 'Sin personal asignado';
+const dur = ms => { const m = Math.max(0, Math.round(ms / 6e4)); return `${Math.floor(m / 60)} h ${m % 60} min`; };
+function weekText(wk) {
+  const lines = [`Horario de monitoreo · semana del ${kdate(wk).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}`, `Turno de día ${S.staff.dayStart}–${hhmm(kdate(wk).setHours(...hmParts(S.staff.dayStart)) + 12 * 36e5)} · noche de 12 h`, ''];
+  for (let n = 0; n < 7; n++) {
+    const k = addDays(wk, n);
+    const by = t => D.staff.filter((p, i) => rot(i, k) === t).map(p => p.short).join(', ') || '—';
+    lines.push(`${kdate(k).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric' })}: Día ${by('D')} · Noche ${by('N')} · Descansa ${by('R')}`);
+  }
+  return lines.join('\n');
+}
+
+PAGES.personal = (param) => {
+  const c = onDuty(), now = Date.now(), today = dkey(new Date());
+  const wk = monday(isDay(param) ? param : today);
+  const nextType = c.type === 'D' ? 'N' : 'D', nextDate = c.type === 'D' ? c.date : addDays(c.date, 1);
+  const nextOn = D.staff.filter((p, i) => rot(i, nextDate) === nextType);
+  const rest = D.staff.filter((p, i) => rot(i, today) === 'R');
+  return topbar('Personal activo y horarios', `Turnos de 12 horas · ${D.staff.length} colaboradores`) +
+  `<section class="banner"><div class="head">${ic(c.type === 'D' ? 'sun' : 'moon', c.type === 'D' ? 't-med' : 'c-unit', true)}<div class="tags"><span class="pr pr-ok">${svg('check', 2.6)}En turno ahora</span><span class="pr ${c.type === 'D' ? 'pr-med' : 'pr-info'}">Turno de ${c.type === 'D' ? 'día' : 'noche'}</span></div></div>
+    <h2>${names(c.on)}</h2>
+    <div class="meta"><span class="num">${hhmm(c.from)} – ${hhmm(c.to)}</span><span class="num">Termina en ${dur(c.to - now)}</span></div></section>
+  <div class="group" style="margin-top:12px">
+    <div class="li">${ic(nextType === 'D' ? 'sun' : 'moon', nextType === 'D' ? 't-med' : 'c-unit', true)}<span class="body"><span class="sub" style="margin:0 0 2px">Siguiente turno · ${nextType === 'D' ? 'día' : 'noche'} desde las ${hhmm(c.to)}</span><span class="ttl">${names(nextOn)}</span></span></div>
+    <div class="li">${ic('bed', 'c-cfg', true)}<span class="body"><span class="sub" style="margin:0 0 2px">Descansan hoy</span><span class="ttl">${names(rest)}</span></span></div>
+  </div>
+  ${secH('Horario de la semana')}
+  <section class="card" style="margin-top:0">${weekNav('personal', wk)}${weekGrid(wk, false)}
+    <a class="link" href="#turnos-${wk}">${svg('cfg')}Configurar horarios</a></section>
+  ${secH('Colaboradores de monitoreo')}
+  <div class="group">${D.staff.map((p, i) => { const [t, cls] = SHIFT[rot(i, today)]; return `<div class="li"><span class="avatar dir-av" aria-hidden="true">${esc(p.name.split(' ').map(w => w[0]).slice(0, 2).join(''))}</span><span class="body"><span class="ttl">${esc(p.name)}</span><span class="sub">Monitoreo · hoy en ${POS[cyclePos(i, today)].toLowerCase()} del ciclo</span></span><span class="wk-c ${cls}" style="min-width:86px">${t}</span></div>`; }).join('')}</div>`;
+};
+
+PAGES.turnos = (param) => {
+  const today = dkey(new Date());
+  const wk = monday(isDay(param) ? param : today);
+  return topbar('Configurar horarios', 'Personal de monitoreo', 'personal-' + wk) +
+  `<section class="card" style="margin-top:14px"><h3>${ic('calendar', 'c-op')}Horario por semana</h3>
+    <p>Toca un día para cambiarlo: Día → Noche → Descanso. Los días cambiados a mano llevan un punto.</p>
+    ${weekNav('turnos', wk)}${weekGrid(wk, true)}
+    <div class="actions"><button class="act" data-a="wkreset" data-wk="${wk}">${ic('back', 'c-cfg')}<span class="grow">Volver a la rotación<small>Quita los cambios manuales de esta semana</small></span></button>
+    <button class="act primary" data-a="wkshare" data-wk="${wk}">${ic('send', '')}<span class="grow">Compartir horario de la semana<small>Por WhatsApp, correo u otra app</small></span></button></div>
+  </section>
+  <section class="card"><h3>${ic('cfg', 'c-cfg')}Rotación</h3>
+    <p>Ciclo de 6 días: 2 de día, 2 de noche y 2 de descanso. Indica en qué día del ciclo está hoy cada colaborador y la app calcula las demás semanas.</p>
+    ${D.staff.map((p, i) => `<div class="row"><span class="lbl">${esc(p.name)}</span><select class="field" style="flex:0 0 140px;height:42px" id="pos-${i}" data-a="pos" data-i="${i}" aria-label="Hoy le toca a ${esc(p.short)}">${POS.map((l, n) => `<option value="${n}" ${n === cyclePos(i, today) ? 'selected' : ''}>${l}</option>`).join('')}</select></div>`).join('')}
+    <div class="row"><span class="lbl">Inicio del turno de día<small>El turno de noche empieza 12 horas después</small></span><input class="field" style="flex:0 0 120px;height:42px" type="time" id="day-start" data-a="daystart" value="${esc(S.staff.dayStart)}" aria-label="Inicio del turno de día"></div>
+  </section>
+  <section class="card"><h3>${ic('info', 'c-cfg')}Dónde se guarda</h3><p>Los horarios se guardan en este teléfono. Para que el equipo los vea, usa <b>Compartir horario de la semana</b>.</p></section>`;
+};
+
+PAGES.actividades = () => {
+  const c = onDuty(), key = c.date + '-' + c.type, st = S.acts[key] || [];
+  let n = 0;
+  const total = D.activities.reduce((a, g) => a + g.items.length, 0);
+  const done = st.filter(Boolean).length;
+  const body = D.activities.map(g => `<div class="grp-h">${esc(g.group)}<span class="n num">${g.items.length}</span></div>
+    <ul class="steps">${g.items.map(it => { const k = n++; return `<li><button role="checkbox" aria-checked="${!!st[k]}" data-a="act" data-k="${k}"><span class="box">${svg('check', 3)}</span><span class="txt">${esc(it.text)}${it.suggested ? ' <span class="pr pr-info" style="margin-left:4px">Sugerida</span>' : ''}</span></button></li>`; }).join('')}</ul>`).join('');
+  return topbar('Actividades de monitoreo', `Turno de ${c.type === 'D' ? 'día' : 'noche'} · ${hhmm(c.from)} – ${hhmm(c.to)}`) +
+  `<section class="card" style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b style="font-size:17px">${done} de ${total} hechas</b><span style="color:var(--ink-3);font-size:13px">Se reinicia en cada turno</span></div>
+    <div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}" aria-label="Avance de actividades"><span style="width:${total ? Math.round(done / total * 100) : 0}%"></span></div></section>
+  ${body}
+  <div class="actions"><button class="act" data-a="actreset">${ic('back', 'c-cfg')}<span class="grow">Desmarcar todo<small>Empieza la lista de nuevo</small></span></button></div>`;
+};
+
 PAGES.config = () => {
   const seg = (v, l) => `<button data-a="theme" data-v="${v}" aria-pressed="${S.settings.theme === v}">${l}</button>`;
   return topbar('Configuración', `${esc(D.user.name)} · ${esc(D.user.role)}`) +
@@ -256,12 +371,13 @@ PAGES.config = () => {
     <div class="row"><span class="lbl">Texto más grande<small>Aumenta el tamaño de toda la app</small></span><button class="switch" role="switch" aria-checked="${S.settings.big}" aria-label="Texto más grande" data-a="big"></button></div>
     <div class="row"><span class="lbl">Reducir animaciones<small>También se respeta la opción del dispositivo</small></span><button class="switch" role="switch" aria-checked="${S.settings.rm}" aria-label="Reducir animaciones" data-a="rm"></button></div>
   </section>
+  <section class="card"><h3>${ic('badge', 'c-log')}Horarios del personal</h3><p>Da de alta los turnos de cada semana y ajusta la rotación de 12 horas.</p><a class="btn" href="#turnos" style="display:inline-flex;align-items:center;text-decoration:none">Configurar horarios</a></section>
   <section class="card"><h3>${ic('download', 'c-unit')}Instalar en el teléfono</h3><div data-install-info></div></section>
   <section class="card"><h3>${ic('user', 'c-log')}Perfil</h3><div class="kv"><div><small>Nombre</small><b>${esc(D.user.name)}</b></div><div><small>Rol</small><b>${esc(D.user.role)}</b></div><div><small>Turno</small><b>${esc(D.user.shift)}</b></div><div><small>Empresa</small><b>${esc(D.company.name)}</b></div></div></section>
   <section class="card"><h3>${ic('info', 'c-cfg')}Modo demostración</h3>
     <p>Esta versión usa datos de ejemplo. No está conectada a GPS, a la base de datos ni a otros usuarios.</p>
   </section>
-  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.6 demostración</p>`;
+  <p style="text-align:center;color:var(--ink-3);font-size:13px;margin:18px 0 0">${esc(D.company.app)} · versión 1.8 demostración</p>`;
 };
 
 /* ---------- Router ---------- */
@@ -362,6 +478,28 @@ app.addEventListener('click', async (e) => {
     toast(`Abriendo el marcador: ${b.dataset.num}. Si no se abre, márcalo a mano.`);
   }
   else if (a === 'sendnow') { if (sheetCb) await sheetCb(); }
+  else if (a === 'cyc') {
+    const k = b.dataset.k, i = +b.dataset.i, order = ['D', 'N', 'R'];
+    const nxt = order[(order.indexOf(rot(i, k)) + 1) % 3];
+    S.sched[k] = S.sched[k] || {};
+    if (nxt === D.rotation.pattern[cyclePos(i, k)]) delete S.sched[k][i]; else S.sched[k][i] = nxt;
+    if (!Object.keys(S.sched[k]).length) delete S.sched[k];
+    save(); refresh();
+  }
+  else if (a === 'wkreset') { for (let n = 0; n < 7; n++) delete S.sched[addDays(b.dataset.wk, n)]; save(); refresh(); toast('La semana volvió a la rotación.'); }
+  else if (a === 'wkshare') {
+    const text = weekText(b.dataset.wk);
+    openSheet(`<h3>¿Compartir horario?</h3><p>Elige a quién enviarlo en el siguiente paso.</p><textarea class="field" readonly rows="9" aria-label="Horario de la semana">${esc(text)}</textarea>
+      <div class="opt" style="border:0"><div class="grow"></div><button class="call neutral" data-a="sendnow">Compartir</button></div>`,
+      async () => { const r = await shareText('Horario de monitoreo', text); if (r === 'cancel') return; closeSheet(); r === 'manual' ? showManual(text) : toast(shareMsg[r]); });
+  }
+  else if (a === 'act') {
+    const c = onDuty(), key = c.date + '-' + c.type, k = +b.dataset.k;
+    const st = S.acts[key] = S.acts[key] || []; st[k] = !st[k];
+    const keys = Object.keys(S.acts).sort(); while (keys.length > 10) delete S.acts[keys.shift()];
+    save(); refresh();
+  }
+  else if (a === 'actreset') { const c = onDuty(); delete S.acts[c.date + '-' + c.type]; save(); refresh(); }
   else if (a === 'night') setTheme(isDark() ? 'light' : 'dark');
   else if (a === 'theme') setTheme(b.dataset.v);
   else if (a === 'big') { S.settings.big = !S.settings.big; save(); applySettings(); refresh(); }
@@ -380,6 +518,16 @@ app.addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
     drawer.querySelectorAll('[data-nav]').forEach(el => el.hidden = !!q && !el.dataset.nav.includes(q));
     drawer.querySelectorAll('.grp').forEach(g => g.hidden = !!q);
+  }
+});
+app.addEventListener('change', (e) => {
+  const a = e.target.dataset.a;
+  if (a === 'pos') {
+    const i = +e.target.dataset.i, today = dkey(new Date());
+    S.staff.offsets[i] = mod(+e.target.value - (dayNum(today) - dayNum(D.rotation.anchor)), D.rotation.pattern.length);
+    save(); refresh(); toast('Rotación actualizada.');
+  } else if (a === 'daystart' && /^\d{2}:\d{2}$/.test(e.target.value)) {
+    S.staff.dayStart = e.target.value; save(); refresh(); renderDrawer(); toast('Horario de turno actualizado.');
   }
 });
 app.addEventListener('submit', (e) => {

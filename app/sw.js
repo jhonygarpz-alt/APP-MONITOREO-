@@ -1,5 +1,5 @@
 /* Service worker: guarda la app para abrirla aunque falle la red. */
-const CACHE = 'centinela-v1.7.0';
+const CACHE = 'centinela-v1.8.0';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'directorio.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

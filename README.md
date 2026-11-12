@@ -11,7 +11,7 @@ App web instalable (PWA), sin paso de compilación: HTML, CSS y JavaScript.
 - `data.js`: **datos de ejemplo** (protocolos, contactos, pólizas, horarios, zonas). La app no administra unidades, incidentes ni bitácora.
 - `manifest.webmanifest`, `sw.js`, `icons/`: instalación y funcionamiento sin red.
 
-Secciones: Inicio, Protocolos, Emergencias, Directorio de operadores, Seguros, Horarios de circulación, Zonas de riesgo, Reportes (vacía por ahora), Configuración.
+Secciones: Inicio, Operación del día (liga externa), Actividades de monitoreo, Personal activo y horarios (con configuración semanal), Protocolos, Emergencias, Directorio de operadores, Seguros, Horarios de circulación, Zonas de riesgo, Reportes (vacía por ahora), Configuración.
 
 Probar en local:
 

@@ -70,5 +70,39 @@ window.DATA = {
     { id: 'Z-02', level: 'alto', name: 'Arco Norte, Km 30 – 60', state: 'Hidalgo', window: '22:00 – 05:00', risk: 'Robo con bloqueo de carretera', advice: 'Evitar paradas. Reportar cualquier reducción de velocidad.' },
     { id: 'Z-03', level: 'medio', name: 'Cumbres de Maltrata', state: 'Veracruz – Puebla', window: 'Todo el día', risk: 'Niebla, pendientes y poca cobertura celular', advice: 'Pérdida de señal frecuente. Esperar 10 min antes de escalar.' },
     { id: 'Z-04', level: 'medio', name: 'Paradores sin vigilancia, Lagos de Moreno', state: 'Jalisco', window: '21:00 – 06:00', risk: 'Robo de combustible y mercancía', advice: 'Usar solo paradores autorizados.' }
+  ],
+
+  /* Personal de monitoreo. Rotación de 12 horas: 2 días de día, 2 noches y 2 de descanso (ciclo de 6 días).
+     offset = posición de cada colaborador en el ciclo el día de "anchor" (0 = primer día de turno de día).
+     Se puede ajustar desde Configuración → Horarios del personal. */
+  staff: [
+    { name: 'Pamela Marion Argil Garcia', short: 'Pamela', offset: 0 },
+    { name: 'Gabriel Eduardo Avalos Rios', short: 'Gabriel', offset: 4 },
+    { name: 'David Cruz', short: 'David', offset: 2 }
+  ],
+  rotation: { anchor: '2026-11-09', pattern: ['D', 'D', 'N', 'N', 'R', 'R'], dayStart: '06:00' },
+
+  /* Actividades del área de monitoreo. suggested: true = agregada como sugerencia. */
+  activities: [
+    { group: 'Inicio de turno', items: [
+      { text: 'Verificar que la plataforma GPS y las cámaras estén en línea', suggested: true },
+      { text: 'Revisar pendientes que entrega el turno anterior', suggested: true },
+      { text: 'Revisión de unidades en mapa' }
+    ] },
+    { group: 'Durante el turno', items: [
+      { text: 'Seguimiento de unidades' },
+      { text: 'Seguimiento a viajes en ruta' },
+      { text: 'Revisión de cámaras' },
+      { text: 'Notificación de estatus a cliente' },
+      { text: 'Notificación a operador de las asignaciones de viaje' },
+      { text: 'Vigilar zonas de riesgo y horarios de circulación', suggested: true },
+      { text: 'Reportar unidades sin señal o detenidas fuera de ruta', suggested: true },
+      { text: 'Atender botón de pánico y emergencias según protocolo', suggested: true }
+    ] },
+    { group: 'Cierre de turno', items: [
+      { text: 'Cerrar viajes en ERP y automatizar rutas' },
+      { text: 'Confirmar llegadas y entregas con el cliente', suggested: true },
+      { text: 'Entregar turno con pendientes al siguiente monitorista', suggested: true }
+    ] }
   ]
 };
